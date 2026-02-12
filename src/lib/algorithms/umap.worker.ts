@@ -81,7 +81,7 @@ function runEpochs() {
 	if (!umap || !isRunning) return;
 
 	// 每次处理一小批 epoch，避免阻塞 Worker 消息队列太久
-	const iterationsPerFrame = 5; 
+	const iterationsPerFrame = 50;
 	
 	for (let i = 0; i < iterationsPerFrame; i++) {
 		if (currentEpoch >= totalEpochs) {

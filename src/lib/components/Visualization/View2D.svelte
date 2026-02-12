@@ -105,6 +105,7 @@
 	<div 
 		class="absolute inset-0 z-10 outline-none"
 		role="application"
+		aria-label="Interactive UMAP Projection Canvas"
 		tabindex="-1"
 		onmousedown={handleMouseDown}
 		onmousemove={handleMouseMove}

@@ -7,23 +7,46 @@
 	// 获取 Threlte 上下文 (用于 Raycaster)
 	const { camera, renderer } = useThrelte();
 
-	// 1. 数据准备
-	// pointsToRender 是一个对象数组 [{x, y, idx, cluster}, ...]
-	// 我们需要把它展平为 Float32Array 传给 GPU
+	// 1. 数据准备 (计算包围盒并归一化)
 	let positions = $derived.by(() => {
 		const points = appState.pointsToRender;
 		if (!points.length) return new Float32Array(0);
 		
 		const arr = new Float32Array(points.length * 3);
-		// 找出数据范围，用于归一化到 [-10, 10] 的视口
-		// (简单起见，我们假设 UMAP 输出在特定范围内，或者在这里做动态缩放)
-		// 通常 UMAP 输出在 [-10, 10] 左右，正好适合 Three.js
+		
+		// --- [新增] 自动计算中心点和缩放 ---
+		// 为了让点铺满屏幕，我们需要找到数据的 min/max
+		let minX = Infinity, maxX = -Infinity;
+		let minY = Infinity, maxY = -Infinity;
+
+		for (let i = 0; i < points.length; i++) {
+			const x = points[i].x;
+			const y = points[i].y;
+			if (x < minX) minX = x;
+			if (x > maxX) maxX = x;
+			if (y < minY) minY = y;
+			if (y > maxY) maxY = y;
+		}
+
+		const centerX = (minX + maxX) / 2;
+		const centerY = (minY + maxY) / 2;
+		const rangeX = maxX - minX || 1; // 防止除以0
+		const rangeY = maxY - minY || 1;
+		
+		// 目标是将数据映射到 [-10, 10] 的范围 (Threlte 默认视口大小附近)
+		// 这样相机 zoom=20 就能刚好看到
+		const targetRange = 20; 
+		const scale = targetRange / Math.max(rangeX, rangeY);
+
 		for (let i = 0; i < points.length; i++) {
 			const p = points[i];
-			arr[i * 3] = p.x;
-			arr[i * 3 + 1] = p.y;
-			arr[i * 3 + 2] = 0; // Z=0，平面
+			// 居中并缩放
+			arr[i * 3]     = (p.x - centerX) * scale;
+			arr[i * 3 + 1] = (p.y - centerY) * scale;
+			arr[i * 3 + 2] = 0;
 		}
+		// ----------------------------------
+		
 		return arr;
 	});
 
@@ -213,7 +236,7 @@
 		</T.BufferGeometry>
 		
 		<T.PointsMaterial
-			size={0.5}
+			size={1.5}
 			vertexColors
 			sizeAttenuation={true}
 			transparent={true}
