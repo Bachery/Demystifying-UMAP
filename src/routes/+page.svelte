@@ -1,7 +1,8 @@
 <script lang="ts">
+	import { appState } from '$lib/stores/app.svelte';
 	import SidebarDataset from '$lib/components/Controls/SidebarDataset.svelte';
 	import SidebarInteraction from '$lib/components/Controls/SidebarInteraction.svelte';
-	import { appState } from '$lib/stores/app.svelte';
+	import View3D from '$lib/components/Visualization/View3D.svelte';
 
 	// 控制 Tab 切换的状态
 	let activeTab = $state('dataset'); // 'dataset' | 'interaction'
@@ -59,7 +60,7 @@
 		</div>
 	</div>
 
-	<div class="flex-1 relative flex flex-col items-center justify-center bg-slate-100/50 overflow-hidden">
+	<!-- <div class="flex-1 relative flex flex-col items-center justify-center bg-slate-100/50 overflow-hidden">
 		<div class="absolute inset-0 bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:16px_16px] opacity-50"></div>
 		
 		<div class="relative z-10 flex flex-col items-center">
@@ -71,5 +72,19 @@
 				Loaded: {appState.dataset?.name || 'None'}
 			</p>
 		</div>
+	</div> -->
+
+	<div class="flex-1 relative flex flex-col items-center justify-center bg-slate-100/50 overflow-hidden p-4">
+		{#if appState.dataset}
+			<div class="w-full h-full flex gap-4">
+				<div class="flex-1 h-full">
+					<View3D />
+				</div>
+				<div class="flex-1 h-full bg-white rounded-xl shadow-inner border border-gray-200 flex items-center justify-center text-gray-400">
+					2D Canvas Placeholder
+				</div>
+			</div>
+		<!-- {:else} -->
+		{/if}
 	</div>
 </main>
