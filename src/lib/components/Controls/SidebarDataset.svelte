@@ -8,7 +8,7 @@
 	let selectedCatColumn = $state('default'); 
 </script>
 
-<div class="h-full flex flex-col bg-white/60 backdrop-blur-xl border-r border-gray-200/50 shadow-2xl w-80">
+<div class="h-full flex flex-col bg-transparent">
 	
 	<div class="p-5 border-b border-gray-200/50 bg-white/40 sticky top-0 z-10 backdrop-blur-md flex justify-between items-baseline">
 		<h2 class="text-2xl font-bold tracking-tight text-gray-800">Dataset</h2>
