@@ -3,6 +3,7 @@
 	import SidebarDataset from '$lib/components/Controls/SidebarDataset.svelte';
 	import SidebarInteraction from '$lib/components/Controls/SidebarInteraction.svelte';
 	import View3D from '$lib/components/Visualization/View3D.svelte';
+	import View2D from '$lib/components/Visualization/View2D.svelte';
 
 	// 控制 Tab 切换的状态
 	let activeTab = $state('dataset'); // 'dataset' | 'interaction'
@@ -80,8 +81,8 @@
 				<div class="flex-1 h-full">
 					<View3D />
 				</div>
-				<div class="flex-1 h-full bg-white rounded-xl shadow-inner border border-gray-200 flex items-center justify-center text-gray-400">
-					2D Canvas Placeholder
+				<div class="flex-1 h-full">
+					<View2D />
 				</div>
 			</div>
 		<!-- {:else} -->
