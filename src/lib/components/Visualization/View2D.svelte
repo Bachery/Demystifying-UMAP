@@ -102,6 +102,8 @@
 		<h3 class="text-xs font-bold text-gray-600 uppercase tracking-wider">UMAP Projection (2D)</h3>
 	</div>
 
+	
+	<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 	<div 
 		class="absolute inset-0 z-10 outline-none"
 		role="application"

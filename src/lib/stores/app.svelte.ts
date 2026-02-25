@@ -65,7 +65,9 @@ export class AppState {
 	pointsToRender = $derived.by(() => {
 		const curr = this.currentProjectionData;
 		const prev = this.previousProjectionData;
-		if (!curr.length || !this.usingRows.length) return [];
+		
+		// 增加安全检查：如果为空，直接返回
+		if (!curr || curr.length === 0 || !this.usingRows || this.usingRows.length === 0) return [];
 
 		return curr
 			.filter((_, idx) => this.usingRows.includes(idx))
@@ -73,18 +75,18 @@ export class AppState {
 				const actualIdx = this.usingRows[i];
 				const cluster = this.labelsOfSelectedCat[actualIdx] || '';
 				
-				if (this.animationProgress < 1.0 && prev.length) {
+				let x = point[0];
+				let y = point[1];
+
+				// 增加对 prev 和 prev[actualIdx] 的绝对安全检查
+				if (this.animationProgress < 1.0 && prev && prev.length > actualIdx) {
 					const prevPoint = prev[actualIdx];
-					if (prevPoint) {
-						return {
-							idx: actualIdx,
-							x: prevPoint[0] + (point[0] - prevPoint[0]) * this.animationProgress,
-							y: prevPoint[1] + (point[1] - prevPoint[1]) * this.animationProgress,
-							cluster
-						};
+					if (prevPoint && prevPoint.length >= 2) {
+						x = prevPoint[0] + (x - prevPoint[0]) * this.animationProgress;
+						y = prevPoint[1] + (y - prevPoint[1]) * this.animationProgress;
 					}
 				}
-				return { idx: actualIdx, x: point[0], y: point[1], cluster };
+				return { idx: actualIdx, x, y, cluster };
 			});
 	});
 
@@ -207,13 +209,16 @@ export class AppState {
 	}
 
 	private updateCurrentProjectionRealtime(embedding: number[][]) {
-		// 临时策略：如果当前已经是最新，就直接改；如果当前没有，就 push 一个临时的
+		// 如果没有传入，直接返回避免报错
+		if (!embedding) return; 
+
 		if (this.history.length === 0 || this.currentProjectionIdx === -1) {
 			this.history.push({ data: embedding, thumbnail: '', params: this.params });
 			this.currentProjectionIdx = 0;
 		} else {
-			// 直接修改当前引用的数据以触发响应式更新
 			this.history[this.currentProjectionIdx].data = embedding;
+			// [修复] Svelte 5 触发深层数组响应式的关键：重新赋值自身引用
+			this.history = this.history; 
 		}
 	}
 

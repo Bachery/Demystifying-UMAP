@@ -80,22 +80,21 @@ function initUMAP(data: number[][], params: UMAPParams, initPositions?: number[]
 function runEpochs() {
 	if (!umap || !isRunning) return;
 
-	// 每次处理一小批 epoch，避免阻塞 Worker 消息队列太久
-	const iterationsPerFrame = 50;
+	// [修改] 从 5 改为 50，大幅减少主线程的渲染压力
+	const iterationsPerBatch = 50; 
 	
-	for (let i = 0; i < iterationsPerFrame; i++) {
+	for (let i = 0; i < iterationsPerBatch; i++) {
 		if (currentEpoch >= totalEpochs) {
 			isRunning = false;
 			postMessage({ type: 'FINISHED', embedding: umap.getEmbedding() });
 			return;
 		}
 		
-		// 计算一步优化
 		umap.step();
 		currentEpoch++;
 	}
 
-	// 发送当前进度的坐标给主线程渲染
+	// 恢复发送 embedding，因为我们后面优化了渲染逻辑，现在不怕卡了
 	postMessage({
 		type: 'UPDATE',
 		embedding: umap.getEmbedding(),
@@ -103,6 +102,5 @@ function runEpochs() {
 		isFinished: false
 	});
 
-	// 通过 setTimeout 让出时间片，允许接收 'STOP' 消息
 	setTimeout(runEpochs, 0); 
 }
