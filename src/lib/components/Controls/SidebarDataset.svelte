@@ -2,6 +2,7 @@
 	import DatasetSelector from './DatasetSelector.svelte';
 	import SidebarComponent from './SidebarComponent.svelte';
 	import SidebarCategory from './SidebarCategory.svelte';
+	import RunControl from '$lib/components/Controls/RunControl.svelte';
 	import { appState } from '$lib/stores/app.svelte';
 
 	// 假设未来支持选择不同的类别作为标签
@@ -18,7 +19,7 @@
 	</div>
 
 	<div class="p-5 flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar">
-		
+
 		<div class="mb-6">
 			<h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Data Source</h3>
 			<DatasetSelector />
@@ -28,10 +29,10 @@
 			{#if appState.categoricalColumns.length > 0}
 				{#each appState.categoricalColumns as col}
 					<div class="flex items-start gap-2 mb-2">
-						<input 
-							type="radio" 
+						<input
+							type="radio"
 							name="cat-group"
-							bind:group={selectedCatColumn} 
+							bind:group={selectedCatColumn}
 							value={col}
 							class="mt-1 text-blue-600 focus:ring-blue-500 border-gray-300"
 						/>
@@ -57,8 +58,10 @@
 				<div class="text-gray-400 italic text-sm py-2">Intrinsic 3D coordinates are used.</div>
 			{/if}
 		</SidebarComponent>
-		
+
 	</div>
+
+	<RunControl />
 </div>
 
 <style>

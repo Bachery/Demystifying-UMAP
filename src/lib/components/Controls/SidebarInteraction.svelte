@@ -4,31 +4,7 @@
 	import Slider from '$lib/components/UI/Slider.svelte';
 	import Toggle from '$lib/components/UI/Toggle.svelte';
 	import MorphControl from '$lib/components/Controls/MorphControl.svelte';
-
-	// 运行 UMAP 的函数
-	function handleRun() {
-		if (!appState.dataset) {
-			alert("Please load a dataset first.");
-			return;
-		}
-
-		// 检查是否需要在当前坐标基础上运行 (Steering)
-		if (appState.manualMode && appState.draggedPointsIdx.length > 0) {
-			// 如果处于手动模式且有点被拖拽了，我们把当前的 embedding 作为初始位置传进去
-			// (注意：这里需要把 Proxy 对象转为纯数组)
-			const currentEmbedding = $state.snapshot(appState.currentProjectionData);
-			appState.runUMAP(currentEmbedding);
-		} else {
-			// 标准重新运行（随机初始化）
-			appState.runUMAP();
-		}
-	}
-
-	// 简单的重置视角功能
-	function handleReset() {
-		// 这里未来可以对接 3D/2D 视图的 Reset Camera 方法
-		// 目前先留空
-	}
+	import RunControl from '$lib/components/Controls/RunControl.svelte';
 </script>
 
 <div class="h-full flex flex-col bg-transparent">
@@ -95,28 +71,5 @@
 
 	</div>
 
-	<div class="p-4 border-t border-gray-200/50 bg-white/80 backdrop-blur-md">
-		
-		{#if appState.isCalculating}
-			<div class="mb-3 flex justify-between items-center text-xs font-mono text-blue-600 animate-pulse">
-				<span>Optimizing...</span>
-				<span>{appState.currentEpoch} / {appState.totalEpochs}</span>
-			</div>
-			<div class="w-full bg-gray-200 rounded-full h-1.5 mb-4 overflow-hidden">
-				<div 
-					class="bg-blue-600 h-1.5 rounded-full transition-all duration-75" 
-					style="width: {(appState.currentEpoch / appState.totalEpochs) * 100}%"
-				></div>
-			</div>
-		{/if}
-
-		<button 
-			onclick={handleRun}
-			disabled={!appState.dataset || appState.isCalculating}
-			class="w-full py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-sm font-bold uppercase tracking-wider rounded-lg shadow-lg hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
-		>
-			{appState.isCalculating ? 'Stop' : (appState.manualMode ? 'Re-run with Priors' : 'Run UMAP')}
-		</button>
-
-	</div>
+	<RunControl />
 </div>
