@@ -169,9 +169,6 @@ export class AppState {
 		this.currentProjectionIdx = -1;
 		this.previousProjectionIdx = -1;
 		this.animationProgress = 1.0;
-		
-		// 自动开始第一次计算
-		this.runUMAP();
 	}
 
 	/**
