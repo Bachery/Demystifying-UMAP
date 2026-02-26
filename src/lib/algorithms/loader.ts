@@ -24,4 +24,20 @@ export class DatasetLoader {
 			throw e;
 		}
 	}
+
+	/**
+	 * Try to load the pre-computed spectral initialization for a dataset.
+	 * File name convention: {datasetName}_spectral_init_nn15.json
+	 * Returns null if the file does not exist or fails to load.
+	 */
+	async loadSpectralInit(datasetName: string): Promise<number[][] | null> {
+		try {
+			const response = await fetch(`/datasets/${datasetName}_spectral_init_nn15.json`);
+			if (!response.ok) return null;
+			const json = await response.json();
+			return (json.data as number[][]) ?? null;
+		} catch {
+			return null;
+		}
+	}
 }

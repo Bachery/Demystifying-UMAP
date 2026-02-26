@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { appState } from '$lib/stores/app.svelte';
 
-	function handleRun() {
+	async function handleRun() {
 		if (!appState.dataset) {
 			alert("Please load a dataset first.");
 			return;
@@ -9,9 +9,9 @@
 
 		if (appState.manualMode && appState.draggedPointsIdx.length > 0) {
 			const currentEmbedding = $state.snapshot(appState.currentProjectionData);
-			appState.runUMAP(currentEmbedding);
+			await appState.runUMAP(currentEmbedding);
 		} else {
-			appState.runUMAP();
+			await appState.runUMAP();
 		}
 	}
 </script>

@@ -1,7 +1,9 @@
 // src/lib/stores/app.svelte.ts
-import { type DatasetResult } from '$lib/algorithms/loader';
+import { type DatasetResult, DatasetLoader } from '$lib/algorithms/loader';
 import type { UMAPParams } from '$lib/algorithms/umap.worker';
 import UmapWorker from '$lib/algorithms/umap.worker?worker';
+
+const loader = new DatasetLoader();
 
 export class AppState {
 	// ==========================================
@@ -173,8 +175,10 @@ export class AppState {
 
 	/**
 	 * 核心计算方法
+	 * 若未传入 manualInit，则尝试加载对应数据集的 spectral 初始化文件；
+	 * 文件不存在时回退到 umap-js 默认初始化。
 	 */
-	runUMAP(manualInit?: number[][]) {
+	async runUMAP(manualInit?: number[][]) {
 		if (!this.dataMatrix.length || !this.worker) return;
 
 		// 停止之前的
@@ -182,19 +186,30 @@ export class AppState {
 
 		this.isCalculating = true;
 		this.currentEpoch = 0;
-		this.totalEpochs = this.params.nEpochs; // 更新进度条上限
+		this.totalEpochs = this.params.nEpochs;
+
+		// 确定初始化位置
+		let initPositions: number[][] | undefined = manualInit
+			? $state.snapshot(manualInit)
+			: undefined;
+
+		if (!initPositions && this.dataset?.name) {
+			const spectral = await loader.loadSpectralInit(this.dataset.name);
+			if (spectral) {
+				initPositions = spectral;
+				console.log(`[UMAP] Using spectral init for "${this.dataset.name}" (${spectral.length} points)`);
+			} else {
+				console.log(`[UMAP] No spectral init found for "${this.dataset.name}", using default init`);
+			}
+		}
 
 		// 发送给 Worker
 		this.worker.postMessage({
 			type: 'INIT',
-			data: $state.snapshot(this.dataMatrix), // 传原始3D数据
+			data: $state.snapshot(this.dataMatrix),
 			params: $state.snapshot(this.params),
-			initPositions: manualInit ? $state.snapshot(manualInit) : undefined
+			initPositions
 		});
-
-		// 占位：在 History 里先占一个位置用于显示进度
-		// (如果不占位，UI 会因为 currentProjectionData 为空而不渲染)
-		// 这里我们先不做复杂的占位，而是依靠 updateCurrentProjectionRealtime 动态推数据
 	}
 
 	/**
