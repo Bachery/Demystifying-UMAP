@@ -85,7 +85,38 @@
 					<View2D />
 				</div>
 			</div>
-		<!-- {:else} -->
+		{:else}
+			<div class="w-full h-full flex gap-4">
+				<!-- 3D View Placeholder -->
+				<div class="flex-1 h-full rounded-2xl bg-white/50 border border-gray-200/60 shadow-sm backdrop-blur-sm flex flex-col items-center justify-center gap-4 select-none">
+					<div class="absolute inset-0 rounded-2xl bg-[radial-gradient(#e2e8f0_1px,transparent_1px)] [background-size:20px_20px] opacity-60 pointer-events-none"></div>
+					<svg class="w-14 h-14 text-gray-300" fill="none" stroke="currentColor" stroke-width="1.2" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M21 7.5l-9-5.25L3 7.5m18 0l-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9" />
+					</svg>
+					<div class="text-center">
+						<p class="text-gray-400 font-medium text-sm tracking-wider uppercase">3D View</p>
+						<p class="text-gray-300 text-xs mt-1">Load a dataset to visualize</p>
+					</div>
+				</div>
+				<!-- 2D View Placeholder -->
+				<div class="flex-1 h-full rounded-2xl bg-white/50 border border-gray-200/60 shadow-sm backdrop-blur-sm flex flex-col items-center justify-center gap-4 select-none relative overflow-hidden">
+					<div class="absolute inset-0 rounded-2xl bg-[radial-gradient(#e2e8f0_1px,transparent_1px)] [background-size:20px_20px] opacity-60 pointer-events-none"></div>
+					<svg class="w-14 h-14 text-gray-300" fill="none" stroke="currentColor" stroke-width="1.2" viewBox="0 0 24 24">
+						<circle cx="5" cy="5" r="1.5" />
+						<circle cx="12" cy="8" r="1.5" />
+						<circle cx="19" cy="4" r="1.5" />
+						<circle cx="7" cy="14" r="1.5" />
+						<circle cx="15" cy="17" r="1.5" />
+						<circle cx="10" cy="19" r="1.5" />
+						<circle cx="18" cy="12" r="1.5" />
+						<circle cx="4" cy="19" r="1.5" />
+					</svg>
+					<div class="text-center">
+						<p class="text-gray-400 font-medium text-sm tracking-wider uppercase">2D View</p>
+						<p class="text-gray-300 text-xs mt-1">Load a dataset to visualize</p>
+					</div>
+				</div>
+			</div>
 		{/if}
 	</div>
 </main>
