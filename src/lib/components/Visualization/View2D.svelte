@@ -96,27 +96,24 @@
 	}
 </script>
 
-<div class="w-full h-full relative bg-white rounded-xl shadow-inner border border-gray-200 overflow-hidden select-none">
-	
+<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+<div
+	class="w-full h-full relative bg-white rounded-xl shadow-inner border border-gray-200 overflow-hidden select-none"
+	onmousedown={handleMouseDown}
+	onmousemove={handleMouseMove}
+	onmouseup={handleMouseUp}
+	onmouseleave={handleMouseUp}
+	oncontextmenu={(e) => e.preventDefault()}
+>
+
 	<div class="absolute top-3 left-3 z-10 bg-white/80 backdrop-blur px-2 py-1 rounded border border-gray-200 shadow-sm pointer-events-none">
 		<h3 class="text-xs font-bold text-gray-600 uppercase tracking-wider">UMAP Projection (2D)</h3>
 	</div>
 
-	
-	<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-	<div 
-		class="absolute inset-0 z-10 outline-none"
-		role="application"
-		aria-label="Interactive UMAP Projection Canvas"
-		tabindex="-1"
-		onmousedown={handleMouseDown}
-		onmousemove={handleMouseMove}
-		onmouseup={handleMouseUp}
-		onmouseleave={handleMouseUp}
-		oncontextmenu={(e) => e.preventDefault()}
-	>
+	<!-- Visual-only overlay: pointer-events-none so the Canvas beneath receives events -->
+	<div class="absolute inset-0 z-10 pointer-events-none">
 		{#if selectionBox}
-			<div 
+			<div
 				class="absolute border border-blue-500 bg-blue-200/30 pointer-events-none"
 				style="left: {selectionBox.left}px; top: {selectionBox.top}px; width: {selectionBox.width}px; height: {selectionBox.height}px;"
 			></div>

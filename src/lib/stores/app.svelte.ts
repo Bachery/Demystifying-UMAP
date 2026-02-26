@@ -126,6 +126,34 @@ export class AppState {
 	manualMode = $state(false);
 	draggedPointsIdx = $state<number[]>([]);
 
+	/**
+	 * Toggle the entire cluster of the clicked point into/out of draggedPointsIdx.
+	 * - If clicked point IS in draggedPointsIdx: remove all cluster members that are in the array.
+	 * - If clicked point is NOT in draggedPointsIdx: add all cluster members not already in the array.
+	 */
+	toggleClusterSelection(pointIdx: number) {
+		const label = String(this.labelsOfSelectedCat[pointIdx] ?? '');
+		if (!label) return;
+
+		// All points (within usingRows) that share the same cluster label
+		const clusterPoints = this.usingRows.filter(
+			(idx) => String(this.labelsOfSelectedCat[idx] ?? '') === label
+		);
+
+		const clickedIsSelected = this.draggedPointsIdx.includes(pointIdx);
+
+		if (clickedIsSelected) {
+			// Remove cluster members from the selection
+			const clusterSet = new Set(clusterPoints);
+			this.draggedPointsIdx = this.draggedPointsIdx.filter((idx) => !clusterSet.has(idx));
+		} else {
+			// Add cluster members not already in the selection
+			const existingSet = new Set(this.draggedPointsIdx);
+			const toAdd = clusterPoints.filter((idx) => !existingSet.has(idx));
+			this.draggedPointsIdx = [...this.draggedPointsIdx, ...toAdd];
+		}
+	}
+
 	// ==========================================
 	// 5. 初始化与构造
 	// ==========================================
