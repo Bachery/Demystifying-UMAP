@@ -68,14 +68,6 @@ function initUMAP(data: number[][], params: UMAPParams, initPositions?: number[]
 		}
 	}
 	
-	// 发送初始状态回主线程
-	postMessage({
-		type: 'UPDATE',
-		embedding: umap.getEmbedding(),
-		epoch: 0,
-		isFinished: false
-	});
-
 	// 开始循环
 	runEpochs();
 }
