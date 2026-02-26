@@ -71,12 +71,9 @@ export class AppState {
 		const prev = this.previousProjectionData;
 
 		// 增加安全检查：如果为空，直接返回
-		if (!curr || curr.length === 0 || !this.usingRows || this.usingRows.length === 0) {
-			console.log('[Store] pointsToRender: empty, curr.length=', curr?.length, 'usingRows.length=', this.usingRows?.length);
-			return [];
-		}
+		if (!curr || curr.length === 0 || !this.usingRows || this.usingRows.length === 0) return [];
 
-		const result = curr
+		return curr
 			.filter((_, idx) => this.usingRows.includes(idx))
 			.map((point, i) => {
 				const actualIdx = this.usingRows[i];
@@ -95,8 +92,6 @@ export class AppState {
 				}
 				return { idx: actualIdx, x, y, cluster };
 			});
-		console.log('[Store] pointsToRender recomputed, len:', result.length, 'pt[0]:', result[0]?.x?.toFixed(3), result[0]?.y?.toFixed(3));
-		return result;
 	});
 
 	// ==========================================
@@ -229,9 +224,7 @@ export class AppState {
 
 	private updateCurrentProjectionRealtime(embedding: number[][]) {
 		if (!embedding) return;
-		console.log('[Store] realtimeEmbedding updating, point[0]:', embedding[0]?.slice(0, 2));
 		this.realtimeEmbedding = embedding;
-		console.log('[Store] realtimeEmbedding assigned. Current value same ref?', this.realtimeEmbedding === embedding);
 	}
 
 	private finishCalculation(embedding: number[][]) {

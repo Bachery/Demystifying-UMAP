@@ -33,7 +33,6 @@
 	// ==========================================
 	let positions = $derived.by(() => {
 		const points = appState.pointsToRender;
-		console.log('[Scene2D] positions derived running, points.length:', points?.length);
 		if (!points || points.length === 0) return new Float32Array(0);
 		
 		const arr = new Float32Array(points.length * 3);
@@ -126,18 +125,14 @@
 		return arr;
 	});
 
-	// 手动更新 BufferGeometry 属性，确保每次 positions/colors 变化时 GPU 数据都被刷新
+	// 手动更新 BufferGeometry 属性
 	// 注意：先读取所有响应式变量，避免 short-circuit 导致依赖追踪不完整
 	$effect(() => {
 		const pts = positions;   // 先读，确保 Svelte 追踪此依赖
 		const clrs = colors;     // 同上
 		const geo = geometryRef; // 同上
 
-		console.log('[Scene2D] $effect triggered — geo:', !!geo, 'pts.length:', pts.length);
-
 		if (!geo || pts.length === 0) return;
-
-		console.log('[Scene2D] updating geometry, pts[0,1]:', pts[0]?.toFixed(3), pts[1]?.toFixed(3));
 
 		// 更新 position 属性
 		const posAttr = geo.getAttribute('position') as THREE.BufferAttribute | null;
@@ -160,9 +155,7 @@
 		// 重算包围球（避免 frustum culling 剔除）
 		geo.computeBoundingSphere();
 
-		// 通知 Threlte 在下一帧重新渲染
 		invalidate();
-		console.log('[Scene2D] invalidate() called');
 	});
 
 	// 纹理生成
