@@ -53,16 +53,23 @@ function initUMAP(data: number[][], params: UMAPParams, initPositions?: number[]
 	});
 
 	// 1. 同步初始化 (Fit) 部分
-	// 如果有 Steering 传进来的 initPositions，直接用；否则让 UMAP 自己初始化
+	// 先让 umap-js 完整初始化（计算 kNN、建立优化状态），再原地覆盖 embedding 值
+	umap.initializeFit(data);
+
 	if (initPositions && initPositions.length > 0) {
-		// UMAP-js 允许传入初始 embedding
-		// 这一步比较关键，用于 Steering
-		umap.setPrecomputedKNN(null); // 清理旧的
-		umap.initializeFit(data);     // 先初始化内部结构
-		umap.embedding = JSON.parse(JSON.stringify(initPositions)); // 强制覆盖 embedding
-	} else {
-		// 标准初始化
-		umap.initializeFit(data);
+		// 关键：必须原地修改 embedding，不能替换引用！
+		// 原因：umap-js 内部 optimizationState.headEmbedding 在 initializeFit 后与
+		// this.embedding 指向同一个对象引用。step() 通过 headEmbedding 就地修改坐标。
+		// 如果直接赋值 umap.embedding = newArray，只更新了 getEmbedding() 返回的引用，
+		// headEmbedding 仍指向旧的随机初始化数组，导致优化在错误的数组上进行，
+		// 而 getEmbedding() 永远返回未被优化的 spectral init 值（冻结BUG）。
+		const embedding = (umap as any).embedding as number[][];
+		const n = Math.min(embedding.length, initPositions.length);
+		for (let i = 0; i < n; i++) {
+			embedding[i][0] = initPositions[i][0];
+			embedding[i][1] = initPositions[i][1];
+		}
+		console.log('[Worker] Spectral init applied in-place, embedding[0]:', embedding[0]);
 	}
 	
 	// 发送初始状态回主线程

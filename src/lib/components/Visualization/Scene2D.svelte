@@ -4,10 +4,12 @@
 	import { appState } from '$lib/stores/app.svelte';
 	import * as THREE from 'three';
 
-	const { size } = useThrelte();
+	const { size, invalidate } = useThrelte();
 
 	// 正交相机引用，用于响应 canvas 尺寸变化时更新 frustum
 	let cameraRef = $state<THREE.OrthographicCamera | undefined>(undefined);
+	// BufferGeometry 引用，用于手动更新属性并触发重绘
+	let geometryRef = $state<THREE.BufferGeometry | undefined>(undefined);
 
 	// 数据缩放到 ±100（targetRange=200），加 10% padding 留边距
 	const HALF_WORLD = 110;
@@ -31,6 +33,7 @@
 	// ==========================================
 	let positions = $derived.by(() => {
 		const points = appState.pointsToRender;
+		console.log('[Scene2D] positions derived running, points.length:', points?.length);
 		if (!points || points.length === 0) return new Float32Array(0);
 		
 		const arr = new Float32Array(points.length * 3);
@@ -123,6 +126,45 @@
 		return arr;
 	});
 
+	// 手动更新 BufferGeometry 属性，确保每次 positions/colors 变化时 GPU 数据都被刷新
+	// 注意：先读取所有响应式变量，避免 short-circuit 导致依赖追踪不完整
+	$effect(() => {
+		const pts = positions;   // 先读，确保 Svelte 追踪此依赖
+		const clrs = colors;     // 同上
+		const geo = geometryRef; // 同上
+
+		console.log('[Scene2D] $effect triggered — geo:', !!geo, 'pts.length:', pts.length);
+
+		if (!geo || pts.length === 0) return;
+
+		console.log('[Scene2D] updating geometry, pts[0,1]:', pts[0]?.toFixed(3), pts[1]?.toFixed(3));
+
+		// 更新 position 属性
+		const posAttr = geo.getAttribute('position') as THREE.BufferAttribute | null;
+		if (!posAttr || posAttr.count !== pts.length / 3) {
+			geo.setAttribute('position', new THREE.BufferAttribute(pts, 3));
+		} else {
+			posAttr.set(pts);
+			posAttr.needsUpdate = true;
+		}
+
+		// 更新 color 属性
+		const colorAttr = geo.getAttribute('color') as THREE.BufferAttribute | null;
+		if (!colorAttr || colorAttr.count !== clrs.length / 3) {
+			geo.setAttribute('color', new THREE.BufferAttribute(clrs, 3));
+		} else {
+			colorAttr.set(clrs);
+			colorAttr.needsUpdate = true;
+		}
+
+		// 重算包围球（避免 frustum culling 剔除）
+		geo.computeBoundingSphere();
+
+		// 通知 Threlte 在下一帧重新渲染
+		invalidate();
+		console.log('[Scene2D] invalidate() called');
+	});
+
 	// 纹理生成
 	function createCircleTexture() {
 		if (typeof window === 'undefined') return null;
@@ -176,16 +218,7 @@
 			document.body.style.cursor = 'default';
 		}}
 	>
-		<T.BufferGeometry>
-			<T.BufferAttribute
-				args={[positions, 3]}
-				attach={({ parent, ref }) => { (parent as any).setAttribute('position', ref); return () => {}; }}
-			/>
-			<T.BufferAttribute
-				args={[colors, 3]}
-				attach={({ parent, ref }) => { (parent as any).setAttribute('color', ref); return () => {}; }}
-			/>
-		</T.BufferGeometry>
+		<T.BufferGeometry bind:ref={geometryRef} />
 		
 		<T.PointsMaterial
 			size={4} 

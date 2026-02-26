@@ -53,8 +53,10 @@ export class AppState {
 	previousProjectionIdx = $state(-1);
 	changePreviousIdx = $state(true);
 	animationProgress = $state(1.0);
+	realtimeEmbedding = $state<number[][] | null>(null);
 
 	currentProjectionData = $derived.by(() => {
+		if (this.realtimeEmbedding) return this.realtimeEmbedding;
 		if (this.history.length === 0 || this.currentProjectionIdx === -1) return [];
 		return this.history[this.currentProjectionIdx].data;
 	});
@@ -67,16 +69,19 @@ export class AppState {
 	pointsToRender = $derived.by(() => {
 		const curr = this.currentProjectionData;
 		const prev = this.previousProjectionData;
-		
-		// 增加安全检查：如果为空，直接返回
-		if (!curr || curr.length === 0 || !this.usingRows || this.usingRows.length === 0) return [];
 
-		return curr
+		// 增加安全检查：如果为空，直接返回
+		if (!curr || curr.length === 0 || !this.usingRows || this.usingRows.length === 0) {
+			console.log('[Store] pointsToRender: empty, curr.length=', curr?.length, 'usingRows.length=', this.usingRows?.length);
+			return [];
+		}
+
+		const result = curr
 			.filter((_, idx) => this.usingRows.includes(idx))
 			.map((point, i) => {
 				const actualIdx = this.usingRows[i];
 				const cluster = this.labelsOfSelectedCat[actualIdx] || '';
-				
+
 				let x = point[0];
 				let y = point[1];
 
@@ -90,6 +95,8 @@ export class AppState {
 				}
 				return { idx: actualIdx, x, y, cluster };
 			});
+		console.log('[Store] pointsToRender recomputed, len:', result.length, 'pt[0]:', result[0]?.x?.toFixed(3), result[0]?.y?.toFixed(3));
+		return result;
 	});
 
 	// ==========================================
@@ -221,53 +228,36 @@ export class AppState {
 	}
 
 	private updateCurrentProjectionRealtime(embedding: number[][]) {
-		// 如果没有传入，直接返回避免报错
-		if (!embedding) return; 
-
-		if (this.history.length === 0 || this.currentProjectionIdx === -1) {
-			this.history.push({ data: embedding, thumbnail: '', params: this.params });
-			this.currentProjectionIdx = 0;
-		} else {
-			this.history[this.currentProjectionIdx].data = embedding;
-			// [修复] Svelte 5 触发深层数组响应式的关键：重新赋值自身引用
-			this.history = this.history; 
-		}
+		if (!embedding) return;
+		console.log('[Store] realtimeEmbedding updating, point[0]:', embedding[0]?.slice(0, 2));
+		this.realtimeEmbedding = embedding;
+		console.log('[Store] realtimeEmbedding assigned. Current value same ref?', this.realtimeEmbedding === embedding);
 	}
 
 	private finishCalculation(embedding: number[][]) {
 		const thumbnail = ''; // TODO
 
-		// 逻辑：每次 Finish，都应该把当前结果 Push 进 History
-		// 这样 Previous 才能指向 index-1，Current 指向 index
-		
-		// 1. 保存新记录
-		// 必须深拷贝 params，否则后续修改 params 会影响历史记录
+		// 1. 清除实时 embedding，正式存入 history
+		this.realtimeEmbedding = null;
+
 		const snapshotParams = $state.snapshot(this.params);
-		const newRecord = { 
-			data: embedding, 
-			thumbnail, 
+		const newRecord = {
+			data: embedding,
+			thumbnail,
 			params: snapshotParams
 		};
 		this.history.push(newRecord);
 
-		// 2. 更新指针
-		// Previous 变为原来的 Current
+		// 2. 更新指针：Previous 变为原来的 Current，Current 指向最新
 		if (this.currentProjectionIdx !== -1) {
 			this.previousProjectionIdx = this.currentProjectionIdx;
 		}
-		// Current 指向最新
 		this.currentProjectionIdx = this.history.length - 1;
-		
-		// 3. 重置动画进度 (让用户看到变化)
-		// 如果有 Previous，我们把进度设为 0 (显示 Previous)，让用户自己拖到 1 (Current)
-		if (this.previousProjectionIdx !== -1) {
-			this.animationProgress = 0.0; 
-			// 可选：自动播放动画
-			// this.playAnimation(); 
-		} else {
-			this.animationProgress = 1.0;
-		}
-		
+
+		// 3. 始终显示最新结果（animationProgress=1.0）
+		// MorphControl 滑条可让用户手动回看 Previous
+		this.animationProgress = 1.0;
+
 		console.log(`History updated. Curr: ${this.currentProjectionIdx}, Prev: ${this.previousProjectionIdx}`);
 	}
 

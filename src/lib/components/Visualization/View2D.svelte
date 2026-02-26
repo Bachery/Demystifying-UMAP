@@ -124,6 +124,7 @@
 	</div>
 
 	<Canvas
+		renderMode="always"
 		createRenderer={(canvas) => {
 			return new WebGLRenderer({
 				canvas,
