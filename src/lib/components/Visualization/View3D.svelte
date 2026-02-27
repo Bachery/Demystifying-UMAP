@@ -7,14 +7,29 @@
 	let autoRotate = $state(false);
 
 	function handleScreenshot() {
-		// ... (保持不变)
 		const canvas = document.querySelector('#canvas-3d canvas') as HTMLCanvasElement;
 		if (canvas) {
 			const link = document.createElement('a');
-			link.download = 'ground-truth-3d.png';
+			link.download = `${appState.dataset?.name ?? 'ground-truth'}_3d.png`;
 			link.href = canvas.toDataURL('image/png');
 			link.click();
 		}
+	}
+
+	function handleSaveData3D() {
+		const data = appState.dataMatrix;
+		const labels = appState.labelsOfSelectedCat;
+		if (!data.length) return;
+		const dim = data[0].length;
+		const headers = Array.from({ length: dim }, (_, i) => `x${i}`).join(',') + ',label';
+		const rows = data.map((row, i) => row.join(',') + ',' + (labels[i] ?? ''));
+		const csv = [headers, ...rows].join('\n');
+		const blob = new Blob([csv], { type: 'text/csv' });
+		const link = document.createElement('a');
+		link.download = `${appState.dataset?.name ?? 'data'}_3d.csv`;
+		link.href = URL.createObjectURL(blob);
+		link.click();
+		URL.revokeObjectURL(link.href);
 	}
 </script>
 
@@ -51,8 +66,16 @@
 			</button>
 		</div>
 
-		<div class="pointer-events-auto bg-white/90 backdrop-blur rounded-lg shadow-sm border border-gray-200 p-1">
-			<button 
+		<div class="pointer-events-auto bg-white/90 backdrop-blur rounded-lg shadow-sm border border-gray-200 p-1 flex items-center">
+			<button
+				onclick={handleSaveData3D}
+				disabled={!appState.dataSize}
+				class="p-1.5 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+				title="Download Raw Data (CSV)"
+			>
+				<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+			</button>
+			<button
 				onclick={handleScreenshot}
 				class="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
 				title="Save Screenshot"

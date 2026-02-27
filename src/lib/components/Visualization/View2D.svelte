@@ -4,6 +4,8 @@
 	import { appState } from '$lib/stores/app.svelte';
 	import { WebGLRenderer } from 'three';
 
+	let showGrid2D = $state(true);
+
 	// 交互状态
 	let isSelecting = $state(false);
 	let selectionStart = $state({ x: 0, y: 0 });
@@ -73,6 +75,35 @@
 		isDraggingPoints = false;
 	}
 
+	async function handleScreenshot2D() {
+		showGrid2D = false;
+		// Wait two animation frames so Threlte re-renders without the grid
+		await new Promise<void>(r => requestAnimationFrame(() => requestAnimationFrame(() => r())));
+		const canvas = document.querySelector('#canvas-2d canvas') as HTMLCanvasElement;
+		if (canvas) {
+			const link = document.createElement('a');
+			link.download = `${appState.dataset?.name ?? 'embedding'}_2d.png`;
+			link.href = canvas.toDataURL('image/png');
+			link.click();
+		}
+		showGrid2D = true;
+	}
+
+	function handleSaveData2D() {
+		const data = appState.currentProjectionData;
+		const labels = appState.labelsOfSelectedCat;
+		if (!data.length) return;
+		const headers = 'emb_x,emb_y,label';
+		const rows = data.map((row, i) => `${row[0]},${row[1]},${labels[i] ?? ''}`);
+		const csv = [headers, ...rows].join('\n');
+		const blob = new Blob([csv], { type: 'text/csv' });
+		const link = document.createElement('a');
+		link.download = `${appState.dataset?.name ?? 'embedding'}_2d.csv`;
+		link.href = URL.createObjectURL(blob);
+		link.click();
+		URL.revokeObjectURL(link.href);
+	}
+
 	// 辅助函数：更新拖拽点
 	function updateDraggedPoints(dx: number, dy: number) {
 		// 我们不能直接改 derived 的 pointsToRender
@@ -98,6 +129,7 @@
 
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 <div
+	id="canvas-2d"
 	class="w-full h-full relative bg-white rounded-xl shadow-inner border border-gray-200 overflow-hidden select-none"
 	onmousedown={handleMouseDown}
 	onmousemove={handleMouseMove}
@@ -130,13 +162,31 @@
 			});
 		}}
 	>
-		<Scene2D />
+		<Scene2D showGrid={showGrid2D} />
 	</Canvas>
 
 	<div class="absolute bottom-3 left-3 right-3 z-20 flex justify-between items-center pointer-events-none">
 		<div class="pointer-events-auto bg-white/90 backdrop-blur rounded-lg shadow-sm border border-gray-200 p-1 flex gap-2">
 			<button class="px-2 py-1 text-[10px] hover:bg-gray-100 rounded" onclick={() => { /* flipX */ }}>🔁 Flip X</button>
 			<button class="px-2 py-1 text-[10px] hover:bg-gray-100 rounded" onclick={() => { /* rotate */ }}>↪️ Rotate</button>
+		</div>
+
+		<div class="pointer-events-auto bg-white/90 backdrop-blur rounded-lg shadow-sm border border-gray-200 p-1 flex items-center">
+			<button
+				onclick={handleSaveData2D}
+				disabled={!appState.currentProjectionData.length}
+				class="p-1.5 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+				title="Download Embedding (CSV)"
+			>
+				<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+			</button>
+			<button
+				onclick={handleScreenshot2D}
+				class="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+				title="Save Screenshot"
+			>
+				<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+			</button>
 		</div>
 	</div>
 

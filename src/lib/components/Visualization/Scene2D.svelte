@@ -6,6 +6,8 @@
 
 	const { size, invalidate } = useThrelte();
 
+	let { showGrid = true }: { showGrid?: boolean } = $props();
+
 	// Enable Threlte raycasting / pointer-event system for this Canvas
 	interactivity();
 
@@ -266,8 +268,10 @@
 	/>
 </T.OrthographicCamera>
 
-<T.AxesHelper args={[50]} />
-<T.GridHelper args={[400, 40, 0xeeeeee, 0xf5f5f5]} rotation={[Math.PI / 2, 0, 0]} />
+{#if showGrid}
+	<T.AxesHelper args={[50]} />
+	<T.GridHelper args={[400, 40, 0xeeeeee, 0xf5f5f5]} rotation={[Math.PI / 2, 0, 0]} />
+{/if}
 
 <!-- Main point cloud -->
 {#if positions.length > 0}
