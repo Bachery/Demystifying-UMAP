@@ -45,18 +45,14 @@
 		</div>
 
 		<div class="flex-1 overflow-hidden relative">
-			
-			{#if activeTab === 'dataset'}
-				<div class="absolute inset-0 w-full h-full">
-					<SidebarDataset />
-				</div>
-			{/if}
 
-			{#if activeTab === 'interaction'}
-				<div class="absolute inset-0 w-full h-full">
-					<SidebarInteraction />
-				</div>
-			{/if}
+			<div class="absolute inset-0 w-full h-full" class:hidden={activeTab !== 'dataset'}>
+				<SidebarDataset />
+			</div>
+
+			<div class="absolute inset-0 w-full h-full" class:hidden={activeTab !== 'interaction'}>
+				<SidebarInteraction />
+			</div>
 
 		</div>
 	</div>
