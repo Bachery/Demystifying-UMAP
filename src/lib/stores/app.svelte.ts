@@ -2,6 +2,7 @@
 import { type DatasetResult, DatasetLoader } from '$lib/algorithms/loader';
 import type { UMAPParams } from '$lib/algorithms/umap.worker';
 import UmapWorker from '$lib/algorithms/umap.worker?worker';
+import { hsl } from 'd3-color';
 
 const loader = new DatasetLoader();
 
@@ -19,7 +20,8 @@ export class AppState {
 	categoricalColumns = $state<string[]>([]);
 	selectedNumColumns = $state<string[]>([]);
 	selectedCatColumn = $state<string>('');
-	categoriesInfo = $state<Record<string, any>>({}); 
+	categoriesInfo = $state<Record<string, any>>({});
+	continuousRange = $state<{ min: number; max: number } | null>(null);
 	labelsOfSelectedCat = $state<string[]>([]); 
 
 	// Derived: 获取选中的数值列的 Index
@@ -284,13 +286,37 @@ export class AppState {
 
 	private setupCategories(labels: any[], type: string) {
 		const info: Record<string, any> = {};
-		const uniqueLabels = [...new Set(labels)];
-		const colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'];
-		uniqueLabels.forEach((label, index) => {
-			const labelStr = String(label);
-			const count = labels.filter(l => l === label).length;
-			info[labelStr] = { cluster_id: index, size: count, color: colors[index % colors.length] };
-		});
+
+		// Count occurrences in O(n)
+		const countMap = new Map<string, number>();
+		for (const label of labels) {
+			const key = String(label);
+			countMap.set(key, (countMap.get(key) || 0) + 1);
+		}
+
+		if (type === 'continuous') {
+			const numericValues = [...countMap.keys()].map(Number);
+			const minVal = Math.min(...numericValues);
+			const maxVal = Math.max(...numericValues);
+			const range = maxVal - minVal || 1;
+			this.continuousRange = { min: minVal, max: maxVal };
+
+			for (const [labelStr, count] of countMap) {
+				const t = (Number(labelStr) - minVal) / range; // 0 → 1
+				// Blue (t=0, hue=240°) → Red (t=1, hue=0°)
+				const color = hsl((1 - t) * 240, 0.85, 0.5);
+				info[labelStr] = { cluster_id: 0, size: count, color: color.formatHex() };
+			}
+		} else {
+			this.continuousRange = null;
+			const colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'];
+			let index = 0;
+			for (const [labelStr, count] of countMap) {
+				info[labelStr] = { cluster_id: index, size: count, color: colors[index % colors.length] };
+				index++;
+			}
+		}
+
 		this.categoriesInfo = { 'Label': info };
 	}
 }
