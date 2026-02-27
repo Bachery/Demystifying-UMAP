@@ -6,8 +6,17 @@
 
 	let { autoRotate = false } = $props();
 
-	// Enable Threlte raycasting / pointer-event system for this Canvas
-	interactivity();
+	// Enable Threlte raycasting.
+	// Default threshold = 1 world unit is far too large: with sizeAttenuation=true
+	// the visual radius is material.size/2 ≈ 0.15–0.25 world units.
+	// Excess threshold causes the closest-by-depth neighbour to be picked instead
+	// of the point under the cursor, producing an apparent upper-right offset.
+	const interactivityCtx = interactivity();
+	$effect(() => {
+		interactivityCtx.raycaster.params.Points = {
+			threshold: appState.dataSize > 10000 ? 0.15 : 0.25
+		};
+	});
 
 	// ==========================================
 	// 1. Positions — raw 3D coords, flat array
