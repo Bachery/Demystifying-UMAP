@@ -144,6 +144,33 @@
 		URL.revokeObjectURL(link.href);
 	}
 
+	// ==========================================
+	// 视图变换：Flip X / Flip Y / Rotate 90° CW
+	// 使用 .map() 生成新数组引用，确保 Svelte 5 响应式链重新求值
+	// ==========================================
+	function applyToCurrentData(transform: (x: number, y: number) => [number, number]) {
+		if (appState.currentProjectionIdx === -1) return;
+		// $state.snapshot 返回普通数组（脱离 proxy），避免 map 中每次读取都经过 proxy 拦截
+		const raw = $state.snapshot(appState.history[appState.currentProjectionIdx].data) as number[][];
+		appState.history[appState.currentProjectionIdx].data = raw.map(row => {
+			const [nx, ny] = transform(row[0], row[1]);
+			return [nx, ny];
+		});
+	}
+
+	function handleFlipX() {
+		applyToCurrentData((x, y) => [-x, y]);
+	}
+
+	function handleFlipY() {
+		applyToCurrentData((x, y) => [x, -y]);
+	}
+
+	function handleRotate() {
+		// 90° 顺时针：(x, y) → (y, -x)
+		applyToCurrentData((x, y) => [y, -x]);
+	}
+
 	// 辅助函数：更新拖拽点
 	function updateDraggedPoints(dx: number, dy: number) {
 		// 我们不能直接改 derived 的 pointsToRender
@@ -206,9 +233,25 @@
 	</Canvas>
 
 	<div class="absolute bottom-3 left-3 right-3 z-20 flex justify-between items-center pointer-events-none">
-		<div class="pointer-events-auto bg-white/90 backdrop-blur rounded-lg shadow-sm border border-gray-200 p-1 flex gap-2">
-			<button class="px-2 py-1 text-[10px] hover:bg-gray-100 rounded" onclick={() => { /* flipX */ }}>🔁 Flip X</button>
-			<button class="px-2 py-1 text-[10px] hover:bg-gray-100 rounded" onclick={() => { /* rotate */ }}>↪️ Rotate</button>
+		<div class="pointer-events-auto bg-white/90 backdrop-blur rounded-lg shadow-sm border border-gray-200 p-1 flex gap-1">
+			<button
+				class="px-2 py-1 text-[10px] hover:bg-gray-100 rounded disabled:opacity-30 disabled:cursor-not-allowed"
+				disabled={!appState.currentProjectionData.length}
+				onclick={handleFlipX}
+				title="Mirror horizontally (negate X)"
+			>&#x2194;&#xFE0E; Flip X</button>
+			<button
+				class="px-2 py-1 text-[10px] hover:bg-gray-100 rounded disabled:opacity-30 disabled:cursor-not-allowed"
+				disabled={!appState.currentProjectionData.length}
+				onclick={handleFlipY}
+				title="Mirror vertically (negate Y)"
+			>&#x2195;&#xFE0E; Flip Y</button>
+			<button
+				class="px-2 py-1 text-[10px] hover:bg-gray-100 rounded disabled:opacity-30 disabled:cursor-not-allowed"
+				disabled={!appState.currentProjectionData.length}
+				onclick={handleRotate}
+				title="Rotate 90° clockwise"
+			>&#x21BB;&#xFE0E; Rotate</button>
 		</div>
 
 		<div class="pointer-events-auto bg-white/90 backdrop-blur rounded-lg shadow-sm border border-gray-200 p-1 flex items-center">

@@ -75,8 +75,9 @@ export class AppState {
 		// 增加安全检查：如果为空，直接返回
 		if (!curr || curr.length === 0 || !this.usingRows || this.usingRows.length === 0) return [];
 
+		const usingSet = new Set(this.usingRows);
 		return curr
-			.filter((_, idx) => this.usingRows.includes(idx))
+			.filter((_, idx) => usingSet.has(idx))
 			.map((point, i) => {
 				const actualIdx = this.usingRows[i];
 				const cluster = this.labelsOfSelectedCat[actualIdx] || '';
