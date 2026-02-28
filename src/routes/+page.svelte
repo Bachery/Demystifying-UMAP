@@ -15,7 +15,7 @@
 
 <main class="w-screen h-screen overflow-hidden flex bg-gray-50/50 font-sans text-gray-800">
 	
-	<div class="h-full z-10 relative flex flex-col w-80 bg-white/60 backdrop-blur-xl border-r border-gray-200/50 shadow-[4px_0_24px_rgba(0,0,0,0.05)]">
+	<div class="h-full z-10 relative flex flex-col w-96 bg-white/60 backdrop-blur-xl border-r border-gray-200/50 shadow-[4px_0_24px_rgba(0,0,0,0.05)]">
 		
 		<div class="flex border-b border-gray-200/50">
 			<button 

@@ -248,7 +248,7 @@
 			</div>
 
 			<div class="flex flex-col gap-2 max-h-[300px] overflow-y-auto pr-1 custom-scrollbar">
-				<div class="grid grid-cols-[30px_1fr_1fr_1fr_40px_20px] gap-1 text-[10px] text-center text-gray-400 font-mono">
+				<div class="grid grid-cols-[44px_1fr_1fr_1fr_52px_20px] gap-1 text-[10px] text-center text-gray-400 font-mono">
 					<div>N</div>
 					<div>X</div>
 					<div>Y</div>
@@ -258,7 +258,7 @@
 				</div>
 
 				{#each blobs as blob, i}
-					<div class="grid grid-cols-[30px_1fr_1fr_1fr_40px_20px] gap-1 items-center">
+					<div class="grid grid-cols-[44px_1fr_1fr_1fr_52px_20px] gap-1 items-center">
 						<input 
 							type="number" 
 							bind:value={blob.num_samples} 

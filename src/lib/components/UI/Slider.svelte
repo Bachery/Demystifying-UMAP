@@ -9,7 +9,7 @@
 			type="number" 
 			bind:value={value} 
 			{min} {max} {step} {disabled}
-			class="w-12 text-xs text-right py-0.5 px-1 rounded border border-gray-200 text-gray-700 font-mono focus:ring-1 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-50"
+			class="w-16 text-xs text-right py-0.5 px-1 rounded border border-gray-200 text-gray-700 font-mono focus:ring-1 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-50"
 		/>
 	</div>
 	<div class="relative h-4 flex items-center">
