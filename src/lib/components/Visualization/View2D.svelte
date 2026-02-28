@@ -27,6 +27,7 @@
 	let _sceneAPI: {
 		fastMoveDraggedPoints: (renderIndices: number[], dx: number, dy: number) => { dataDx: number; dataDy: number };
 		setOrbitEnabled: (enabled: boolean) => void;
+		getPointsInScreenRect: (rect: { left: number; top: number; width: number; height: number }) => number[];
 	} | null = null;
 	let _dragRenderIndices: number[] = [];
 	let _accumDataDx = 0;
@@ -83,7 +84,22 @@
 
 	function handleMouseUp() {
 		if (isSelecting) {
-			// TODO: 实现框选逻辑 (把屏幕坐标转为世界坐标，然后 filter points)
+			// 框选：宽/高 > 5px 才触发，避免误选
+			if (selectionBox && selectionBox.width > 5 && selectionBox.height > 5) {
+				const hitIndices = _sceneAPI?.getPointsInScreenRect(selectionBox) ?? [];
+				if (hitIndices.length > 0) {
+					const existingSet = new Set(appState.draggedPointsIdx);
+					// 若框内所有点都已选中则整体取消，否则新增未选中的点
+					const allSelected = hitIndices.every(idx => existingSet.has(idx));
+					if (allSelected) {
+						const removeSet = new Set(hitIndices);
+						appState.draggedPointsIdx = appState.draggedPointsIdx.filter(idx => !removeSet.has(idx));
+					} else {
+						const toAdd = hitIndices.filter(idx => !existingSet.has(idx));
+						appState.draggedPointsIdx = [...appState.draggedPointsIdx, ...toAdd];
+					}
+				}
+			}
 			isSelecting = false;
 		}
 		if (isDraggingPoints) {

@@ -10,6 +10,7 @@
 	type SceneAPI = {
 		fastMoveDraggedPoints: (renderIndices: number[], screenDx: number, screenDy: number) => { dataDx: number; dataDy: number };
 		setOrbitEnabled: (enabled: boolean) => void;
+		getPointsInScreenRect: (rect: { left: number; top: number; width: number; height: number }) => number[];
 	};
 
 	let {
@@ -342,10 +343,47 @@
 		orbitEnabled = enabled;
 	}
 
+	// ==========================================
+	// 9. Screen-rect → data-index lookup (for box selection)
+	// ==========================================
+	function getPointsInScreenRect(rect: { left: number; top: number; width: number; height: number }): number[] {
+		if (!cameraRef || !geometryRef) return [];
+		const cam = cameraRef;
+		const W = $size.width;
+		const H = $size.height;
+
+		// Orthographic screen → world conversion (accounts for pan + zoom)
+		function screenToWorld(sx: number, sy: number): { wx: number; wy: number } {
+			const wx = (cam.left + (sx / W) * (cam.right - cam.left)) / cam.zoom + cam.position.x;
+			const wy = (cam.top  - (sy / H) * (cam.top - cam.bottom)) / cam.zoom + cam.position.y;
+			return { wx, wy };
+		}
+
+		const { wx: wx1, wy: wy1 } = screenToWorld(rect.left, rect.top);
+		const { wx: wx2, wy: wy2 } = screenToWorld(rect.left + rect.width, rect.top + rect.height);
+		const minX = Math.min(wx1, wx2), maxX = Math.max(wx1, wx2);
+		const minY = Math.min(wy1, wy2), maxY = Math.max(wy1, wy2);
+
+		const posAttr = geometryRef.getAttribute('position') as THREE.BufferAttribute | null;
+		if (!posAttr) return [];
+		const arr = posAttr.array as Float32Array;
+		const pts = appState.pointsToRender;
+		const result: number[] = [];
+
+		for (let i = 0; i < pts.length; i++) {
+			const wx = arr[i * 3];
+			const wy = arr[i * 3 + 1];
+			if (wx >= minX && wx <= maxX && wy >= minY && wy <= maxY) {
+				result.push(pts[i].idx);
+			}
+		}
+		return result;
+	}
+
 	// Expose fast-path API to View2D once the geometry is ready
 	$effect(() => {
 		if (!geometryRef || !onReady) return;
-		onReady({ fastMoveDraggedPoints, setOrbitEnabled });
+		onReady({ fastMoveDraggedPoints, setOrbitEnabled, getPointsInScreenRect });
 	});
 
 	// ==========================================
