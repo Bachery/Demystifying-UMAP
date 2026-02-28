@@ -24,7 +24,10 @@
 	let lastMousePos = { x: 0, y: 0 };
 
 	// Fast-path drag API from Scene2D (bypasses reactive chain during drag)
-	let _sceneAPI: { fastMoveDraggedPoints: (renderIndices: number[], dx: number, dy: number) => void } | null = null;
+	let _sceneAPI: {
+		fastMoveDraggedPoints: (renderIndices: number[], dx: number, dy: number) => { dataDx: number; dataDy: number };
+		setOrbitEnabled: (enabled: boolean) => void;
+	} | null = null;
 	let _dragRenderIndices: number[] = [];
 	let _accumDataDx = 0;
 	let _accumDataDy = 0;
@@ -43,6 +46,7 @@
 			lastMousePos = { x: e.clientX, y: e.clientY };
 			_accumDataDx = 0;
 			_accumDataDy = 0;
+			_sceneAPI?.setOrbitEnabled(false); // prevent camera from panning simultaneously
 
 			// Precompute render indices for dragged data indices (O(K), once per drag start)
 			const pts = appState.pointsToRender;
@@ -65,10 +69,11 @@
 			lastMousePos = { x: e.clientX, y: e.clientY };
 
 			if (_sceneAPI && _dragRenderIndices.length > 0) {
-				// Fast path: directly patch GPU buffer, no reactive chain
-				_sceneAPI.fastMoveDraggedPoints(_dragRenderIndices, dx, dy);
-				_accumDataDx += dx * 0.05;
-				_accumDataDy += -dy * 0.05; // Y-axis flip
+				// Fast path: directly patch GPU buffer, no reactive chain.
+				// Returns camera-aware data delta for state commit on drag end.
+				const { dataDx, dataDy } = _sceneAPI.fastMoveDraggedPoints(_dragRenderIndices, dx, dy);
+				_accumDataDx += dataDx;
+				_accumDataDy += dataDy;
 			} else {
 				// Fallback to reactive path (before Scene2D is ready)
 				updateDraggedPoints(dx * 0.05, -dy * 0.05);
@@ -83,6 +88,7 @@
 		}
 		if (isDraggingPoints) {
 			isDraggingPoints = false;
+			_sceneAPI?.setOrbitEnabled(true); // re-enable camera pan
 			// Commit accumulated displacement to appState once (triggers one reactive update)
 			if (_accumDataDx !== 0 || _accumDataDy !== 0) {
 				updateDraggedPoints(_accumDataDx, _accumDataDy);

@@ -7,7 +7,10 @@
 
 	const { size, invalidate } = useThrelte();
 
-	type SceneAPI = { fastMoveDraggedPoints: (renderIndices: number[], screenDx: number, screenDy: number) => void };
+	type SceneAPI = {
+		fastMoveDraggedPoints: (renderIndices: number[], screenDx: number, screenDy: number) => { dataDx: number; dataDy: number };
+		setOrbitEnabled: (enabled: boolean) => void;
+	};
 
 	let {
 		showGrid = true,
@@ -30,6 +33,9 @@
 	let _worldScale   = 1;
 	let _worldCenterX = 0;
 	let _worldCenterY = 0;
+
+	// Disabled while dragging points so OrbitControls doesn't pan the camera simultaneously
+	let orbitEnabled = $state(true);
 
 	const HALF_WORLD = 110;
 
@@ -264,16 +270,22 @@
 		renderIndices: number[],
 		screenDx: number,
 		screenDy: number
-	): void {
+	): { dataDx: number; dataDy: number } {
 		const geo = geometryRef;
-		if (!geo) return;
+		if (!geo) return { dataDx: 0, dataDy: 0 };
 		const posAttr = geo.getAttribute('position') as THREE.BufferAttribute | null;
-		if (!posAttr) return;
+		if (!posAttr) return { dataDx: 0, dataDy: 0 };
 
-		// screen px → data units → world units
-		const DATA_SCALE = 0.05;
-		const worldDx =  screenDx * DATA_SCALE * _worldScale;
-		const worldDy = -screenDy * DATA_SCALE * _worldScale; // Y-axis flip
+		// Pixel → world: derived from the orthographic camera frustum + OrbitControls zoom.
+		// The camera frustum height (at zoom=1) is 2*halfH world units over $size.height pixels.
+		// OrbitControls zoom further divides the visible range, so effective world-per-pixel = 2*halfH / (height*zoom).
+		const zoom    = cameraRef?.zoom ?? 1;
+		const aspect  = $size.width / $size.height;
+		const halfH   = HALF_WORLD / Math.min(1, aspect);
+		const worldPerPx = (2 * halfH) / ($size.height * zoom);
+
+		const worldDx =  screenDx * worldPerPx;
+		const worldDy = -screenDy * worldPerPx; // Y-axis flip
 
 		const arr = posAttr.array as Float32Array;
 		for (const ri of renderIndices) {
@@ -281,13 +293,59 @@
 			arr[ri * 3 + 1] += worldDy;
 		}
 		posAttr.needsUpdate = true;
+		autoExpandForDraggedPoints(renderIndices, arr);
 		invalidate();
+
+		// Return data-space delta so View2D can accumulate and commit on drag end
+		const dataDx = worldDx / _worldScale;
+		const dataDy = worldDy / _worldScale;
+		return { dataDx, dataDy };
+	}
+
+	// When dragged points approach or exit the camera's visible bounds, smoothly zoom out
+	// so the canvas expands to follow them.
+	function autoExpandForDraggedPoints(renderIndices: number[], arr: Float32Array): void {
+		if (!cameraRef) return;
+		const cam = cameraRef;
+
+		// Camera center in world space (set by OrbitControls pan)
+		const camX = cam.position.x;
+		const camY = cam.position.y;
+
+		// Current visible half-extents in world units
+		const halfW_vis = Math.abs(cam.left) / cam.zoom;
+		const halfH_vis = cam.top / cam.zoom;
+
+		// Target: keep dragged points within 85% of the view edge (15% breathing room)
+		const SAFE_FRACTION = 0.85;
+
+		let maxScaleNeeded = 1.0;
+		for (const ri of renderIndices) {
+			const wx = arr[ri * 3];
+			const wy = arr[ri * 3 + 1];
+			const scaleX = Math.abs(wx - camX) / (halfW_vis * SAFE_FRACTION);
+			const scaleY = Math.abs(wy - camY) / (halfH_vis * SAFE_FRACTION);
+			const scale = Math.max(scaleX, scaleY);
+			if (scale > maxScaleNeeded) maxScaleNeeded = scale;
+		}
+
+		if (maxScaleNeeded > 1.0) {
+			const targetZoom = cam.zoom / maxScaleNeeded;
+			const MIN_ZOOM = 0.05;
+			// Lerp 30% toward target per mouse-move event → smooth expansion
+			cam.zoom = Math.max(MIN_ZOOM, cam.zoom + (targetZoom - cam.zoom) * 0.3);
+			cam.updateProjectionMatrix();
+		}
+	}
+
+	function setOrbitEnabled(enabled: boolean): void {
+		orbitEnabled = enabled;
 	}
 
 	// Expose fast-path API to View2D once the geometry is ready
 	$effect(() => {
 		if (!geometryRef || !onReady) return;
-		onReady({ fastMoveDraggedPoints });
+		onReady({ fastMoveDraggedPoints, setOrbitEnabled });
 	});
 
 	// ==========================================
@@ -345,6 +403,7 @@
 	on:create={({ ref }) => ref.lookAt(0, 0, 0)}
 >
 	<OrbitControls
+		enabled={orbitEnabled}
 		enableRotate={false}
 		enableZoom={true}
 		mouseButtons={{ LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN }}
