@@ -258,8 +258,48 @@ export class AppState {
 		this.realtimeEmbedding = embedding;
 	}
 
+	private generateThumbnail(embedding: number[][]): string {
+		if (typeof window === 'undefined' || !embedding.length) return '';
+		const SIZE = 48, PAD = 3;
+		const canvas = document.createElement('canvas');
+		canvas.width = SIZE; canvas.height = SIZE;
+		const ctx = canvas.getContext('2d');
+		if (!ctx) return '';
+
+		ctx.fillStyle = '#ffffff';
+		ctx.fillRect(0, 0, SIZE, SIZE);
+
+		let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+		for (const [x, y] of embedding) {
+			if (x < minX) minX = x; if (x > maxX) maxX = x;
+			if (y < minY) minY = y; if (y > maxY) maxY = y;
+		}
+		const draw = SIZE - PAD * 2;
+		const scale = draw / (Math.max(maxX - minX, maxY - minY) || 1);
+		const catInfo = this.categoriesInfo['Label'] || {};
+
+		for (let i = 0; i < embedding.length; i++) {
+			const [x, y] = embedding[i];
+			const px = PAD + (x - minX) * scale;
+			const py = PAD + (maxY - y) * scale; // Y flip
+			const label = String(this.labelsOfSelectedCat[i] ?? '');
+			ctx.fillStyle = catInfo[label]?.color ?? '#cccccc';
+			ctx.beginPath();
+			ctx.arc(px, py, 1.2, 0, Math.PI * 2);
+			ctx.fill();
+		}
+		return canvas.toDataURL('image/png');
+	}
+
+	selectHistoryEntry(idx: number) {
+		if (idx === this.currentProjectionIdx) return;
+		this.previousProjectionIdx = this.currentProjectionIdx;
+		this.currentProjectionIdx = idx;
+		this.animationProgress = 1.0;
+	}
+
 	private finishCalculation(embedding: number[][]) {
-		const thumbnail = ''; // TODO
+		const thumbnail = this.generateThumbnail(embedding);
 
 		// 1. 清除实时 embedding，正式存入 history
 		this.realtimeEmbedding = null;
