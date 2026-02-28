@@ -23,6 +23,12 @@
 	let isDraggingPoints = false;
 	let lastMousePos = { x: 0, y: 0 };
 
+	// Fast-path drag API from Scene2D (bypasses reactive chain during drag)
+	let _sceneAPI: { fastMoveDraggedPoints: (renderIndices: number[], dx: number, dy: number) => void } | null = null;
+	let _dragRenderIndices: number[] = [];
+	let _accumDataDx = 0;
+	let _accumDataDy = 0;
+
 	function handleMouseDown(e: MouseEvent) {
 		// 如果按住 Shift 或者是右键，启用框选
 		if (e.shiftKey || e.button === 2) {
@@ -35,6 +41,16 @@
 			// 如果处于 Manual Mode 且 鼠标指着一个被选中的点 -> 开始拖拽
 			isDraggingPoints = true;
 			lastMousePos = { x: e.clientX, y: e.clientY };
+			_accumDataDx = 0;
+			_accumDataDy = 0;
+
+			// Precompute render indices for dragged data indices (O(K), once per drag start)
+			const pts = appState.pointsToRender;
+			const dataToRender = new Map<number, number>();
+			for (let ri = 0; ri < pts.length; ri++) dataToRender.set(pts[ri].idx, ri);
+			_dragRenderIndices = appState.draggedPointsIdx
+				.map(idx => dataToRender.get(idx))
+				.filter((ri): ri is number => ri !== undefined);
 		}
 	}
 
@@ -42,37 +58,39 @@
 		if (isSelecting) {
 			const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
 			selectionEnd = { x: e.clientX - rect.left, y: e.clientY - rect.top };
-		} 
+		}
 		else if (isDraggingPoints) {
-			// 计算屏幕位移
 			const dx = e.clientX - lastMousePos.x;
 			const dy = e.clientY - lastMousePos.y;
-			
-			// 屏幕位移 -> 数据位移
-			// 这是一个近似值，因为我们不知道相机的 Zoom。
-			// 更好的做法是在 Scene2D 里把 camera 导出来算。
-			// 简单起见，给一个感性的缩放因子 (0.05)，用户可以自己感觉
-			const scaleFactor = 0.05; 
-			const dataDx = dx * scaleFactor;
-			const dataDy = -dy * scaleFactor; // Y轴反转
-
-			// 更新所有被拖拽点的坐标
-			// 注意：我们直接修改 currentProjectionData 里的坐标
-			// 这需要 AppState 提供一个 action
-			updateDraggedPoints(dataDx, dataDy);
-
 			lastMousePos = { x: e.clientX, y: e.clientY };
+
+			if (_sceneAPI && _dragRenderIndices.length > 0) {
+				// Fast path: directly patch GPU buffer, no reactive chain
+				_sceneAPI.fastMoveDraggedPoints(_dragRenderIndices, dx, dy);
+				_accumDataDx += dx * 0.05;
+				_accumDataDy += -dy * 0.05; // Y-axis flip
+			} else {
+				// Fallback to reactive path (before Scene2D is ready)
+				updateDraggedPoints(dx * 0.05, -dy * 0.05);
+			}
 		}
 	}
 
 	function handleMouseUp() {
 		if (isSelecting) {
 			// TODO: 实现框选逻辑 (把屏幕坐标转为世界坐标，然后 filter points)
-			// 这步比较麻烦，因为需要相机的投影矩阵。
-			// 暂时先空着，或者只实现拖拽。
 			isSelecting = false;
 		}
-		isDraggingPoints = false;
+		if (isDraggingPoints) {
+			isDraggingPoints = false;
+			// Commit accumulated displacement to appState once (triggers one reactive update)
+			if (_accumDataDx !== 0 || _accumDataDy !== 0) {
+				updateDraggedPoints(_accumDataDx, _accumDataDy);
+			}
+			_dragRenderIndices = [];
+			_accumDataDx = 0;
+			_accumDataDy = 0;
+		}
 	}
 
 	async function handleScreenshot2D() {
@@ -162,7 +180,7 @@
 			});
 		}}
 	>
-		<Scene2D showGrid={showGrid2D} />
+		<Scene2D showGrid={showGrid2D} onReady={(api) => { _sceneAPI = api; }} />
 	</Canvas>
 
 	<div class="absolute bottom-3 left-3 right-3 z-20 flex justify-between items-center pointer-events-none">

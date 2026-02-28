@@ -3,10 +3,19 @@
 	import { OrbitControls, interactivity } from '@threlte/extras';
 	import { appState } from '$lib/stores/app.svelte';
 	import * as THREE from 'three';
+	import { onDestroy } from 'svelte';
 
 	const { size, invalidate } = useThrelte();
 
-	let { showGrid = true }: { showGrid?: boolean } = $props();
+	type SceneAPI = { fastMoveDraggedPoints: (renderIndices: number[], screenDx: number, screenDy: number) => void };
+
+	let {
+		showGrid = true,
+		onReady = undefined
+	}: {
+		showGrid?: boolean;
+		onReady?: (api: SceneAPI) => void;
+	} = $props();
 
 	// Enable Threlte raycasting / pointer-event system for this Canvas
 	interactivity();
@@ -15,6 +24,12 @@
 	let cameraRef = $state<THREE.OrthographicCamera | undefined>(undefined);
 	// Main geometry ref — mutated in-place for perf (avoids full buffer recreate on UMAP frames)
 	let geometryRef = $state<THREE.BufferGeometry | undefined>(undefined);
+
+	// Cached data-to-world transform from the positions derived.
+	// Used by fastMoveDraggedPoints to convert screen pixels → world units.
+	let _worldScale   = 1;
+	let _worldCenterX = 0;
+	let _worldCenterY = 0;
 
 	const HALF_WORLD = 110;
 
@@ -54,6 +69,11 @@
 		const rangeY = maxY - minY || 1;
 		const targetRange = 200;
 		const scale = targetRange / Math.max(rangeX, rangeY);
+
+		// Cache for fast-path drag updates
+		_worldScale   = scale;
+		_worldCenterX = centerX;
+		_worldCenterY = centerY;
 
 		for (let i = 0; i < points.length; i++) {
 			arr[i * 3]     = (points[i].x - centerX) * scale;
@@ -130,12 +150,11 @@
 	});
 
 	// ==========================================
-	// 4. Push positions + colors into the geometry (in-place, avoids GC)
+	// 4a. Push POSITIONS into geometry (only when positions change)
 	// ==========================================
 	$effect(() => {
-		const pts  = positions;
-		const clrs = colors;
-		const geo  = geometryRef;
+		const pts = positions;
+		const geo = geometryRef;
 
 		if (!geo || pts.length === 0) return;
 
@@ -147,6 +166,19 @@
 			posAttr.needsUpdate = true;
 		}
 
+		geo.computeBoundingSphere();
+		invalidate();
+	});
+
+	// ==========================================
+	// 4b. Push COLORS into geometry (only when colors change)
+	// ==========================================
+	$effect(() => {
+		const clrs = colors;
+		const geo  = geometryRef;
+
+		if (!geo || clrs.length === 0) return;
+
 		const colorAttr = geo.getAttribute('color') as THREE.BufferAttribute | null;
 		if (!colorAttr || colorAttr.count !== clrs.length / 3) {
 			geo.setAttribute('color', new THREE.BufferAttribute(clrs, 3));
@@ -155,7 +187,6 @@
 			colorAttr.needsUpdate = true;
 		}
 
-		geo.computeBoundingSphere();
 		invalidate();
 	});
 
@@ -227,19 +258,71 @@
 	});
 
 	// ==========================================
-	// 8. Event handlers
+	// 8. Fast-path drag: directly patch GPU buffer, bypass reactive chain
 	// ==========================================
-	function handlePointerMove(e: any) {
-		if (e.index !== undefined) {
-			appState.selectedPointIdx = appState.pointsToRender[e.index].idx;
-			document.body.style.cursor = 'pointer';
+	function fastMoveDraggedPoints(
+		renderIndices: number[],
+		screenDx: number,
+		screenDy: number
+	): void {
+		const geo = geometryRef;
+		if (!geo) return;
+		const posAttr = geo.getAttribute('position') as THREE.BufferAttribute | null;
+		if (!posAttr) return;
+
+		// screen px → data units → world units
+		const DATA_SCALE = 0.05;
+		const worldDx =  screenDx * DATA_SCALE * _worldScale;
+		const worldDy = -screenDy * DATA_SCALE * _worldScale; // Y-axis flip
+
+		const arr = posAttr.array as Float32Array;
+		for (const ri of renderIndices) {
+			arr[ri * 3]     += worldDx;
+			arr[ri * 3 + 1] += worldDy;
 		}
+		posAttr.needsUpdate = true;
+		invalidate();
+	}
+
+	// Expose fast-path API to View2D once the geometry is ready
+	$effect(() => {
+		if (!geometryRef || !onReady) return;
+		onReady({ fastMoveDraggedPoints });
+	});
+
+	// ==========================================
+	// 9. Event handlers
+	// ==========================================
+	let _pendingHoverIdx: number | null = null;
+	let _hoverRafHandle: number | null = null;
+
+	function handlePointerMove(e: any) {
+		if (e.index === undefined) return;
+		_pendingHoverIdx = appState.pointsToRender[e.index].idx;
+		document.body.style.cursor = 'pointer';
+		if (_hoverRafHandle !== null) return; // already scheduled
+		_hoverRafHandle = requestAnimationFrame(() => {
+			_hoverRafHandle = null;
+			if (_pendingHoverIdx !== null) {
+				appState.selectedPointIdx = _pendingHoverIdx;
+				_pendingHoverIdx = null;
+			}
+		});
 	}
 
 	function handlePointerLeave() {
+		if (_hoverRafHandle !== null) {
+			cancelAnimationFrame(_hoverRafHandle);
+			_hoverRafHandle = null;
+		}
+		_pendingHoverIdx = null;
 		appState.selectedPointIdx = null;
 		document.body.style.cursor = 'default';
 	}
+
+	onDestroy(() => {
+		if (_hoverRafHandle !== null) cancelAnimationFrame(_hoverRafHandle);
+	});
 
 	function handleClick(e: any) {
 		if (e.index !== undefined) {
