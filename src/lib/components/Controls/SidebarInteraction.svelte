@@ -20,7 +20,7 @@
 			<Slider 
 				label="Neighbors" 
 				bind:value={appState.params.nNeighbors} 
-				min={2} max={100} step={1} 
+				min={2} max={300} step={1} 
 			/>
 			<Slider 
 				label="Min Distance" 
