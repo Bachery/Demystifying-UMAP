@@ -105,9 +105,9 @@
 		if (isDraggingPoints) {
 			isDraggingPoints = false;
 			_sceneAPI?.setOrbitEnabled(true); // re-enable camera pan
-			// Commit accumulated displacement to appState once (triggers one reactive update)
+			// Commit accumulated displacement as a new steered history entry
 			if (_accumDataDx !== 0 || _accumDataDy !== 0) {
-				updateDraggedPoints(_accumDataDx, _accumDataDy);
+				appState.commitDragAsNewHistory(appState.draggedPointsIdx, _accumDataDx, _accumDataDy);
 			}
 			_dragRenderIndices = [];
 			_accumDataDx = 0;
@@ -171,27 +171,6 @@
 		applyToCurrentData((x, y) => [y, -x]);
 	}
 
-	// 辅助函数：更新拖拽点
-	function updateDraggedPoints(dx: number, dy: number) {
-		// 我们不能直接改 derived 的 pointsToRender
-		// 我们必须改 source: history[current].data
-		const currentData = appState.history[appState.currentProjectionIdx].data;
-		const draggedSet = new Set(appState.draggedPointsIdx);
-		
-		// 批量修改
-		appState.draggedPointsIdx.forEach(idx => {
-			if (currentData[idx]) {
-				currentData[idx][0] += dx;
-				currentData[idx][1] += dy;
-			}
-		});
-		
-		// 触发 Svelte 响应式更新 (赋值给自己)
-		// appState.history = [...appState.history]; // 暴力触发
-		// 或者更优雅地：AppState 内部应该提供 updatePointPosition 方法
-		// 暂时暴力触发:
-		appState.history[appState.currentProjectionIdx].data = currentData; 
-	}
 </script>
 
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->

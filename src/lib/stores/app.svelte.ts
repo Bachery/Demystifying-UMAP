@@ -54,7 +54,7 @@ export class AppState {
 	// ==========================================
 	// 3. 投影历史与动画 (History & Morphing)
 	// ==========================================
-	history = $state<Array<{ data: number[][], thumbnail: string, params: any }>>([]);
+	history = $state<Array<{ data: number[][], thumbnail: string, params: any, steered?: boolean }>>([]);
 	currentProjectionIdx = $state(-1);
 	previousProjectionIdx = $state(-1);
 	changePreviousIdx = $state(true);
@@ -295,7 +295,7 @@ export class AppState {
 		this.realtimeEmbedding = embedding;
 	}
 
-	private generateThumbnail(embedding: number[][]): string {
+	generateThumbnail(embedding: number[][]): string {
 		if (typeof window === 'undefined' || !embedding.length) return '';
 		const SIZE = 48, PAD = 3;
 		const canvas = document.createElement('canvas');
@@ -332,6 +332,24 @@ export class AppState {
 		if (idx === this.currentProjectionIdx) return;
 		this.previousProjectionIdx = this.currentProjectionIdx;
 		this.currentProjectionIdx = idx;
+		this.animationProgress = 1.0;
+	}
+
+	commitDragAsNewHistory(draggedIndices: number[], dx: number, dy: number) {
+		if (this.currentProjectionIdx === -1) return;
+		const raw = $state.snapshot(this.history[this.currentProjectionIdx].data) as number[][];
+		const newData = raw.map(row => [row[0], row[1]]);
+		for (const idx of draggedIndices) {
+			if (newData[idx]) {
+				newData[idx][0] += dx;
+				newData[idx][1] += dy;
+			}
+		}
+		const thumbnail = this.generateThumbnail(newData);
+		const params = $state.snapshot(this.history[this.currentProjectionIdx].params);
+		this.previousProjectionIdx = this.currentProjectionIdx;
+		this.history.push({ data: newData, thumbnail, params, steered: true });
+		this.currentProjectionIdx = this.history.length - 1;
 		this.animationProgress = 1.0;
 	}
 
