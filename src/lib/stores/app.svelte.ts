@@ -203,6 +203,11 @@ export class AppState {
 		this.labelsOfSelectedCat = result.labels.map(String);
 		this.setupCategories(result.labels, result.type);
 		
+		// 停止正在运行的计算，防止旧结果污染新数据集的历史
+		this.worker?.postMessage({ type: 'STOP' });
+		this.isCalculating = false;
+		this.realtimeEmbedding = null;
+
 		// 重置历史
 		this.history = [];
 		this.currentProjectionIdx = -1;
