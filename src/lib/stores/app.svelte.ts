@@ -238,10 +238,11 @@ export class AppState {
 			// 按用户选择的初始化方式
 			switch (this.initMethod) {
 				case 'spectral': {
-					const spectral = await loader.loadSpectralInit(this.dataset!.name);
+					const nn = this.params.nNeighbors;
+					const spectral = await loader.loadSpectralInit(this.dataset!.name, nn);
 					if (spectral) {
 						initPositions = spectral;
-						console.log(`[UMAP] Spectral init: ${spectral.length} points ("${this.dataset!.name}")`);
+						console.log(`[UMAP] Spectral init (nn=${nn}→closest file): ${spectral.length} points ("${this.dataset!.name}")`);
 					} else {
 						// 文件不存在时回退到 PCA
 						const { embedding, timeMs } = pcaInit($state.snapshot(this.dataMatrix));
