@@ -463,7 +463,7 @@
 	>
 		<T.BufferGeometry bind:ref={geometryRef} />
 		<T.PointsMaterial
-			size={4}
+			size={6}
 			vertexColors
 			sizeAttenuation={false}
 			transparent={true}
@@ -494,7 +494,7 @@
 			/>
 		</T.BufferGeometry>
 		<T.PointsMaterial
-			size={10}
+			size={25}
 			vertexColors
 			sizeAttenuation={false}
 			transparent={true}
@@ -528,7 +528,7 @@
 			/>
 		</T.BufferGeometry>
 		<T.PointsMaterial
-			size={8}
+			size={25}
 			vertexColors
 			sizeAttenuation={false}
 			transparent={true}
