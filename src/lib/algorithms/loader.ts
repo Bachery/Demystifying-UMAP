@@ -6,7 +6,7 @@ export type DatasetResult = {
 	source?: 'local' | 'generated';
 };
 
-const SPECTRAL_NN = [5, 15, 30, 50, 100, 200, 300];
+const SPECTRAL_NN = [5, 15, 30, 50, 100, 200, 300, 500];
 
 function closestNN(n: number): number {
 	return SPECTRAL_NN.reduce((best, v) =>
@@ -37,7 +37,7 @@ export class DatasetLoader {
 	/**
 	 * Try to load the pre-computed spectral initialization for a dataset.
 	 * Picks the file whose nn value is closest to nNeighbors.
-	 * Available nn values: [5, 15, 30, 50, 100, 200, 300]
+	 * Available nn values: [5, 15, 30, 50, 100, 200, 300, 500]
 	 * Returns null if the file does not exist or fails to load.
 	 */
 	async loadSpectralInit(datasetName: string, nNeighbors = 15): Promise<number[][] | null> {
