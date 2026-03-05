@@ -3,6 +3,7 @@ export type DatasetResult = {
 	type: 'continuous' | 'categorical';
 	data: number[][];
 	labels: (string | number)[];
+	source?: 'local' | 'generated';
 };
 
 export class DatasetLoader {

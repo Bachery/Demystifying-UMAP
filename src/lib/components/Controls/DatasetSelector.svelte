@@ -102,7 +102,7 @@
 		try {
 			const loader = new DatasetLoader();
 			const result = await loader.load(selectedDataset);
-			appState.setDataset(result);
+			appState.setDataset({ ...result, source: 'local' });
 		} catch (e) {
 			console.error(e);
 			alert(`Failed to load ${selectedDataset}`);
@@ -151,7 +151,8 @@
 				const datasetResult = {
 					...result,
 					name: selectedDataset,
-					type: (['Swiss-Roll', 'S-Curve', 'Uniform-Strip'].includes(selectedDataset)) ? 'continuous' : 'categorical'
+					type: (['Swiss-Roll', 'S-Curve', 'Uniform-Strip'].includes(selectedDataset)) ? 'continuous' : 'categorical',
+				source: 'generated' as const
 				};
 				appState.setDataset(datasetResult);
 			}

@@ -2,6 +2,7 @@
 import { type DatasetResult, DatasetLoader } from '$lib/algorithms/loader';
 import type { UMAPParams } from '$lib/algorithms/umap.worker';
 import UmapWorker from '$lib/algorithms/umap.worker?worker';
+import { pcaInit } from '$lib/algorithms/pca';
 import { hsl } from 'd3-color';
 
 const loader = new DatasetLoader();
@@ -40,6 +41,9 @@ export class AppState {
 		nEpochs: 500,
 		nComponents: 2
 	});
+
+	initMethod = $state<'random' | 'pca' | 'spectral'>('pca');
+	isLocalDataset = $derived.by(() => this.dataset?.source === 'local');
 
 	// 计算状态 (补全了这里)
 	isCalculating = $state(false);
@@ -204,6 +208,9 @@ export class AppState {
 		this.currentProjectionIdx = -1;
 		this.previousProjectionIdx = -1;
 		this.animationProgress = 1.0;
+
+		// 根据数据来源设置默认初始化方式
+		this.initMethod = result.source === 'local' ? 'spectral' : 'pca';
 	}
 
 	/**
@@ -222,18 +229,42 @@ export class AppState {
 		this.totalEpochs = this.params.nEpochs;
 
 		// 确定初始化位置
-		let initPositions: number[][] | undefined = manualInit
-			? $state.snapshot(manualInit)
-			: undefined;
+		let initPositions: number[][] | undefined;
 
-		if (!initPositions && this.dataset?.name) {
-			const spectral = await loader.loadSpectralInit(this.dataset.name);
-			if (spectral) {
-				initPositions = spectral;
-				console.log(`[UMAP] Using spectral init for "${this.dataset.name}" (${spectral.length} points)`);
-			} else {
-				console.log(`[UMAP] No spectral init found for "${this.dataset.name}", using default init`);
+		if (manualInit) {
+			// 手动拖拽模式：使用当前 embedding 作为初始化
+			initPositions = $state.snapshot(manualInit);
+		} else {
+			// 按用户选择的初始化方式
+			switch (this.initMethod) {
+				case 'spectral': {
+					const spectral = await loader.loadSpectralInit(this.dataset!.name);
+					if (spectral) {
+						initPositions = spectral;
+						console.log(`[UMAP] Spectral init: ${spectral.length} points ("${this.dataset!.name}")`);
+					} else {
+						// 文件不存在时回退到 PCA
+						const { embedding, timeMs } = pcaInit($state.snapshot(this.dataMatrix));
+						initPositions = embedding;
+						console.log(`[UMAP] Spectral init not found, PCA fallback: ${timeMs.toFixed(1)}ms ("${this.dataset!.name}")`);
+					}
+					break;
+				}
+				case 'pca': {
+					const { embedding, timeMs } = pcaInit($state.snapshot(this.dataMatrix));
+					initPositions = embedding;
+					console.log(`[UMAP] PCA init: ${timeMs.toFixed(1)}ms, ${embedding.length} points ("${this.dataset!.name}")`);
+					break;
+				}
+				case 'random':
+					console.log(`[UMAP] Random init ("${this.dataset!.name}")`);
+					break;
 			}
+		}
+
+		// 初始化位置确定后，立即渲染到 2D 画布
+		if (initPositions) {
+			this.realtimeEmbedding = initPositions;
 		}
 
 		// 发送给 Worker
