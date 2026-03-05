@@ -1,26 +1,28 @@
 <script lang="ts">
 	import { appState } from '$lib/stores/app.svelte';
 
-	const initMethods = ['random', 'pca', 'spectral'] as const;
+	const initMethods = ['random', 'pca', 'spectral', 'current'] as const;
 
 	async function handleRun() {
 		if (!appState.dataset) {
 			alert("Please load a dataset first.");
 			return;
 		}
-
-		if (appState.manualMode && appState.draggedPointsIdx.length > 0) {
-			const currentEmbedding = $state.snapshot(appState.currentProjectionData);
-			await appState.runUMAP(currentEmbedding);
-		} else {
-			await appState.runUMAP();
-		}
+		await appState.runUMAP();
 	}
+
+	// Auto-select 'current' init when the active history entry is steered
+	$effect(() => {
+		const entry = appState.history[appState.currentProjectionIdx];
+		if (entry?.steered) {
+			appState.initMethod = 'current';
+		}
+	});
 </script>
 
 <div class="p-4 border-t border-gray-200/50 bg-white/80 backdrop-blur-md">
 
-	{#if !appState.manualMode && appState.dataset}
+	{#if appState.dataset}
 		<div class="mb-3">
 			<!-- Label row with info tooltip -->
 			<div class="flex items-center gap-1.5 mb-1.5">
@@ -28,7 +30,7 @@
 				<div class="relative group">
 					<span class="text-[10px] text-gray-400 cursor-help border border-gray-300 rounded-full w-3.5 h-3.5 flex items-center justify-center shrink-0 select-none">?</span>
 					<div class="absolute bottom-full left-0 mb-1.5 w-56 text-xs text-white bg-gray-800 rounded p-2 shadow-lg hidden group-hover:block z-50 pointer-events-none">
-						Spectral uses pre-computed init files — only available for default datasets. UMAP-JS doesn't support on-the-fly spectral init.
+						Spectral uses pre-computed init files — only available for default datasets. Current uses the active 2D result as initialization.
 						<div class="absolute top-full left-4 border-4 border-transparent border-t-gray-800"></div>
 					</div>
 				</div>
@@ -38,7 +40,9 @@
 			<div class="flex rounded-md overflow-hidden border border-gray-200 text-xs font-medium">
 				{#each initMethods as method}
 					{@const isActive = appState.initMethod === method}
-					{@const isDisabled = method === 'spectral' && !appState.isLocalDataset}
+					{@const isDisabled =
+						(method === 'spectral' && !appState.isLocalDataset) ||
+						(method === 'current' && appState.currentProjectionIdx === -1)}
 					<button
 						class="flex-1 py-1.5 transition-colors
 							{isActive ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}
@@ -71,7 +75,7 @@
 		disabled={!appState.dataset || appState.isCalculating}
 		class="w-full py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-sm font-bold uppercase tracking-wider rounded-lg shadow-lg hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
 	>
-		{appState.isCalculating ? 'Stop' : (appState.manualMode ? 'Re-run with Priors' : 'Run UMAP')}
+		{appState.isCalculating ? 'Stop' : (appState.initMethod === 'current' ? 'Re-run with Priors' : 'Run UMAP')}
 	</button>
 
 </div>

@@ -42,7 +42,7 @@ export class AppState {
 		nComponents: 2
 	});
 
-	initMethod = $state<'random' | 'pca' | 'spectral'>('pca');
+	initMethod = $state<'random' | 'pca' | 'spectral' | 'current'>('pca');
 	isLocalDataset = $derived.by(() => this.dataset?.source === 'local');
 
 	// 计算状态 (补全了这里)
@@ -223,7 +223,7 @@ export class AppState {
 	 * 若未传入 manualInit，则尝试加载对应数据集的 spectral 初始化文件；
 	 * 文件不存在时回退到 umap-js 默认初始化。
 	 */
-	async runUMAP(manualInit?: number[][]) {
+	async runUMAP() {
 		if (!this.dataMatrix.length || !this.worker) return;
 
 		// 停止之前的
@@ -236,12 +236,8 @@ export class AppState {
 		// 确定初始化位置
 		let initPositions: number[][] | undefined;
 
-		if (manualInit) {
-			// 手动拖拽模式：使用当前 embedding 作为初始化
-			initPositions = $state.snapshot(manualInit);
-		} else {
-			// 按用户选择的初始化方式
-			switch (this.initMethod) {
+		// 按用户选择的初始化方式
+		switch (this.initMethod) {
 				case 'spectral': {
 					const nn = this.params.nNeighbors;
 					const spectral = await loader.loadSpectralInit(this.dataset!.name, nn);
@@ -265,8 +261,14 @@ export class AppState {
 				case 'random':
 					console.log(`[UMAP] Random init ("${this.dataset!.name}")`);
 					break;
+				case 'current': {
+					if (this.currentProjectionIdx !== -1) {
+						initPositions = $state.snapshot(this.currentProjectionData) as number[][];
+						console.log(`[UMAP] Current embedding init ("${this.dataset!.name}")`);
+					}
+					break;
+				}
 			}
-		}
 
 		// 初始化位置确定后，立即渲染到 2D 画布
 		if (initPositions) {

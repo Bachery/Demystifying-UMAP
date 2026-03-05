@@ -14,7 +14,7 @@
 		<p class="text-xs text-gray-400 mt-1">Configure & Steer UMAP</p>
 	</div>
 
-	<div class="p-5 flex-1 overflow-y-auto custom-scrollbar flex flex-col gap-6">
+	<div class="p-5 flex-1 overflow-y-auto custom-scrollbar flex flex-col gap-2">
 
 		<SidebarComponent title="Hyperparameters">
 			<Slider 
