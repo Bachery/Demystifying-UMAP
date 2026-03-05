@@ -2,7 +2,6 @@ import { randomNormal, randomUniform } from 'd3-random';
 
 // 基础类型定义
 export interface GeneratorSettings {
-	seed?: number; // 注意：JS很难完全复现Python的随机种子行为，这里仅作为预留
 	num_samples: number;
 	noise?: number;
 	[key: string]: any;
@@ -135,7 +134,7 @@ export function generateTwoMoons(settings: GeneratorSettings): DatasetResult {
 }
 
 // 5. Enclosed Blob
-export function generateEnclosedBlob(settings: { num_inner: number, num_outer: number, radius: number, seed?: number }): DatasetResult {
+export function generateEnclosedBlob(settings: { num_inner: number, num_outer: number, radius: number }): DatasetResult {
 	const { num_inner, num_outer, radius } = settings;
 	const data: number[][] = [];
 	const labels: string[] = [];

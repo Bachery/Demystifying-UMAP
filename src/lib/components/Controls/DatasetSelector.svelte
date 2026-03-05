@@ -28,15 +28,15 @@
 	// 可生成的数据集及其默认参数 (Show Generate UI)
 	// 格式: { [paramName]: defaultValue }
 	const defaultSettings: Record<string, any> = {
-		'Enclosed-Blob':   { num_inner: 5000, num_outer: 2000, radius: 10.0, seed: 42 },
-		'Two-Moons':       { num_samples: 5000, noise: 0.17, seed: 42 },
-		'Swiss-Roll':      { num_samples: 5000, noise: 1.0, seed: 42 },
-		'Uniform-Strip':   { num_samples: 5000, length: 15.0, width: 1.0, seed: 42 },
-		'Torus-Surface':   { num_samples: 5000, ring_radius: 10.0, tube_radius: 8.0, seed: 42 },
-		'S-Curve':         { num_samples: 5000, noise: 0.33, seed: 42 },
-		'Connected-Blobs': { bridge_samples: 500, cov_bridge: 0.8, seed: 42 },
+		'Enclosed-Blob':   { num_inner: 5000, num_outer: 2000, radius: 10.0 },
+		'Two-Moons':       { num_samples: 5000, noise: 0.17 },
+		'Swiss-Roll':      { num_samples: 5000, noise: 1.0 },
+		'Uniform-Strip':   { num_samples: 5000, length: 15.0, width: 1.0 },
+		'Torus-Surface':   { num_samples: 5000, ring_radius: 10.0, tube_radius: 8.0 },
+		'S-Curve':         { num_samples: 5000, noise: 0.33 },
+		'Connected-Blobs': { bridge_samples: 500, cov_bridge: 0.8 },
 		// Gaussian-Blobs 特殊处理，不放在这里
-		'Gaussian-Blobs':  { seed: 42 } 
+		'Gaussian-Blobs':  {}
 	};
 
 	// 把论文的描述整理成一个干净的配置对象
@@ -66,7 +66,6 @@
 	let currentParams = $state<Record<string, number>>({});
 
 	// Gaussian Blobs 的特殊状态
-	let blobSeed = $state(42);
 	let blobs = $state([
 		{ num_samples: 2000, mean: [0, 0, 0], std: 0.8 }
 	]);
@@ -209,26 +208,15 @@
 			
 			<div class="grid grid-cols-2 gap-x-3 gap-y-2">
 				{#each Object.keys(currentParams) as key}
-					{#if key !== 'seed'}
-						<div class="flex flex-col">
-							<!-- <label class="text-[10px] text-gray-400 font-mono mb-0.5">{key}</label> -->
-							<span class="text-[10px] text-gray-400 font-mono mb-0.5">{key}</span>
-							<input 
-								type="number" 
-								bind:value={currentParams[key]}
-								class="w-full text-xs py-1 px-2 rounded border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-right font-mono"
-							/>
-						</div>
-					{/if}
+					<div class="flex flex-col">
+						<span class="text-[10px] text-gray-400 font-mono mb-0.5">{key}</span>
+						<input
+							type="number"
+							bind:value={currentParams[key]}
+							class="w-full text-xs py-1 px-2 rounded border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-right font-mono"
+						/>
+					</div>
 				{/each}
-				
-				{#if 'seed' in currentParams}
-				<div class="flex flex-col">
-					<!-- <label class="text-[10px] text-gray-400 font-mono mb-0.5">seed</label> -->
-					<span class="text-[10px] text-gray-400 font-mono mb-0.5">seed</span>
-					<input type="number" bind:value={currentParams['seed']} class="w-full text-xs py-1 px-2 rounded border-gray-300 text-right font-mono"/>
-				</div>
-				{/if}
 			</div>
 
 			<button 
