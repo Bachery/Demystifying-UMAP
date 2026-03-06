@@ -11,7 +11,7 @@
 		'Antipodal-Clusters', 'Enclosed-Blob', 'Two-Moons', 'Swiss-Roll', 
 		'Uniform-Strip', 'Torus-Surface', 'S-Curve', 'Density-Contrast', 
 		'Distance-Contrast', 'Connected-Blobs',
-		'Hierarchical-Blobs', 'Hierarchy-Loss',
+		// 'Hierarchical-Blobs', 'Hierarchy-Loss',
 		'WorldMap', 'WorldMapRoll', 'WorldMapGlobe',
 		'Gaussian-Blobs',
 	];
@@ -21,7 +21,7 @@
 		'Antipodal-Clusters', 'Enclosed-Blob', 'Two-Moons', 'Swiss-Roll', 
 		'Uniform-Strip', 'Torus-Surface', 'S-Curve', 'Density-Contrast', 
 		'Distance-Contrast', 'Connected-Blobs',
-		'Hierarchical-Blobs', 'Hierarchy-Loss',
+		// 'Hierarchical-Blobs', 'Hierarchy-Loss',
 		'WorldMap', 'WorldMapRoll', 'WorldMapGlobe',
 	]);
 	
@@ -67,7 +67,9 @@
 
 	// Gaussian Blobs 的特殊状态
 	let blobs = $state([
-		{ num_samples: 2000, mean: [0, 0, 0], std: 0.8 }
+		{ num_samples: 1000, mean: [10, 0, 0], std: 0.8 },
+		{ num_samples: 1000, mean: [0, 10, 0], std: 0.8 },
+		{ num_samples: 1000, mean: [0, 0, 10], std: 0.8 },
 	]);
 
 	// 监听选择变化，重置参数
