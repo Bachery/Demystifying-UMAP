@@ -18,6 +18,7 @@
 	type SceneAPI = {
 		fastMoveDraggedPoints: (renderIndices: number[], screenDx: number, screenDy: number) => { dataDx: number; dataDy: number };
 		setOrbitEnabled: (enabled: boolean) => void;
+		setHoverEnabled: (enabled: boolean) => void;
 		getPointsInScreenRect: (rect: { left: number; top: number; width: number; height: number }) => number[];
 	};
 
@@ -371,6 +372,21 @@
 		orbitEnabled = enabled;
 	}
 
+	let hoverEnabled = true;
+	function setHoverEnabled(enabled: boolean): void {
+		hoverEnabled = enabled;
+		if (!enabled) {
+			// Cancel any pending hover and clear selection immediately
+			if (_hoverRafHandle !== null) {
+				cancelAnimationFrame(_hoverRafHandle);
+				_hoverRafHandle = null;
+			}
+			_pendingHoverIdx = null;
+			appState.selectedPointIdx = null;
+			document.body.style.cursor = 'default';
+		}
+	}
+
 	// ==========================================
 	// 9. Screen-rect → data-index lookup (for box selection)
 	// ==========================================
@@ -411,7 +427,7 @@
 	// Expose fast-path API to View2D once the geometry is ready
 	$effect(() => {
 		if (!geometryRef || !onReady) return;
-		onReady({ fastMoveDraggedPoints, setOrbitEnabled, getPointsInScreenRect });
+		onReady({ fastMoveDraggedPoints, setOrbitEnabled, setHoverEnabled, getPointsInScreenRect });
 	});
 
 	// ==========================================
@@ -421,7 +437,7 @@
 	let _hoverRafHandle: number | null = null;
 
 	function handlePointerMove(e: any) {
-		if (e.index === undefined) return;
+		if (!hoverEnabled || e.index === undefined) return;
 		_pendingHoverIdx = appState.pointsToRender[e.index].idx;
 		document.body.style.cursor = 'pointer';
 		if (_hoverRafHandle !== null) return; // already scheduled

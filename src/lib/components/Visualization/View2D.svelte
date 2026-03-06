@@ -27,11 +27,13 @@
 	let _sceneAPI: {
 		fastMoveDraggedPoints: (renderIndices: number[], dx: number, dy: number) => { dataDx: number; dataDy: number };
 		setOrbitEnabled: (enabled: boolean) => void;
+		setHoverEnabled: (enabled: boolean) => void;
 		getPointsInScreenRect: (rect: { left: number; top: number; width: number; height: number }) => number[];
 	} | null = null;
 	let _dragRenderIndices: number[] = [];
 	let _accumDataDx = 0;
 	let _accumDataDy = 0;
+	let _justFinishedDrag = false; // suppresses the post-drag mouseup→click event
 
 	function handleMouseDown(e: MouseEvent) {
 		// 如果按住 Shift 或者是右键，启用框选
@@ -47,6 +49,11 @@
 			lastMousePos = { x: e.clientX, y: e.clientY };
 			_accumDataDx = 0;
 			_accumDataDy = 0;
+			// Disable hover detection for the entire drag: pointermove events keep firing
+			// during drag and would re-set selectedPointIdx, causing the proxy (which reads
+			// from the reactive positions array, NOT the fast-path GPU buffer) to linger
+			// at the original position and create a ghost artifact.
+			_sceneAPI?.setHoverEnabled(false);
 			_sceneAPI?.setOrbitEnabled(false); // prevent camera from panning simultaneously
 
 			// Precompute render indices for dragged data indices (O(K), once per drag start)
@@ -104,6 +111,8 @@
 		}
 		if (isDraggingPoints) {
 			isDraggingPoints = false;
+			_justFinishedDrag = true; // suppress the click event that fires after mouseup
+			_sceneAPI?.setHoverEnabled(true);
 			_sceneAPI?.setOrbitEnabled(true); // re-enable camera pan
 			// Commit accumulated displacement as a new steered history entry
 			if (_accumDataDx !== 0 || _accumDataDy !== 0) {
@@ -184,6 +193,7 @@
 	onmouseup={handleMouseUp}
 	onmouseleave={handleMouseUp}
 	oncontextmenu={(e) => e.preventDefault()}
+	onclickcapture={(e) => { if (_justFinishedDrag) { e.stopPropagation(); _justFinishedDrag = false; } }}
 >
 
 	<div class="absolute top-3 left-3 z-10 bg-white/80 backdrop-blur px-2 py-1 rounded border border-gray-200 shadow-sm pointer-events-none">
