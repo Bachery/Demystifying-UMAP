@@ -52,23 +52,14 @@
 		for (let i = 0; i < appState.dataSize; i++) {
 			const label = String(appState.labelsOfSelectedCat[i] ?? '');
 
-			// Base cluster color
-			let colorStr = '#cccccc';
-			if (hasUnstable && unstableSet.has(i)) {
-				colorStr = '#ff0000';
-			} else {
-				const info = catInfo[label];
-				if (info) colorStr = info.color;
-			}
+			const colorStr = catInfo[label]?.color ?? '#cccccc';
 			tempColor.set(colorStr);
 
-			// Fading: dim points that are neither dragged nor in the hovered cluster
-			if (hasAnySelection) {
-				const isInDragged = draggedSet.has(i);
-				const isInHoveredCluster = hoveredCluster !== null && label === hoveredCluster;
-				if (!isInDragged && !isInHoveredCluster) {
-					tempColor.lerp(whiteColor, 0.3);
-				}
+			const isInUnstable       = hasUnstable && unstableSet.has(i);
+			const isInDragged        = draggedSet.has(i);
+			const isInHoveredCluster = hoveredCluster !== null && label === hoveredCluster;
+			if ((hasUnstable || hasAnySelection) && !isInUnstable && !isInDragged && !isInHoveredCluster) {
+				tempColor.lerp(whiteColor, 0.3);
 			}
 
 			colorArray[i * 3]     = tempColor.r;

@@ -161,21 +161,14 @@
 			const p     = points[i];
 			const label = String(p.cluster);
 
-			let colorStr = '#cccccc';
-			if (hasUnstable && unstableSet.has(p.idx)) {
-				colorStr = '#ff0000';
-			} else if (catInfo[label]) {
-				colorStr = catInfo[label].color;
-			}
+			const colorStr = catInfo[label]?.color ?? '#cccccc';
 			tempColor.set(colorStr);
 
-			// Fade points that are neither dragged nor in the hovered cluster
-			if (hasAnySelection) {
-				const isInDragged       = draggedSet.has(p.idx);
-				const isInHoveredCluster = hoveredCluster !== null && label === hoveredCluster;
-				if (!isInDragged && !isInHoveredCluster) {
-					tempColor.lerp(whiteColor, 0.3);
-				}
+			const isInUnstable       = hasUnstable && unstableSet.has(p.idx);
+			const isInDragged        = draggedSet.has(p.idx);
+			const isInHoveredCluster = hoveredCluster !== null && label === hoveredCluster;
+			if ((hasUnstable || hasAnySelection) && !isInUnstable && !isInDragged && !isInHoveredCluster) {
+				tempColor.lerp(whiteColor, 0.3);
 			}
 
 			arr[i * 3]     = tempColor.r;
