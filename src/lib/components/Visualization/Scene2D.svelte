@@ -174,7 +174,7 @@
 				const isInDragged       = draggedSet.has(p.idx);
 				const isInHoveredCluster = hoveredCluster !== null && label === hoveredCluster;
 				if (!isInDragged && !isInHoveredCluster) {
-					tempColor.lerp(whiteColor, 0.8);
+					tempColor.lerp(whiteColor, 0.3);
 				}
 			}
 
@@ -258,14 +258,12 @@
 		const label = String(appState.labelsOfSelectedCat[appState.selectedPointIdx] ?? '');
 		const info  = appState.categoriesInfo['Label']?.[label];
 		const color = new THREE.Color(info?.color ?? '#cccccc');
-		// Slightly brighter to pop above faded neighbors
-		color.lerp(new THREE.Color('#ffffff'), 0.3);
 
 		return {
 			position: new Float32Array([x, y, 0.5]),
 			// White ring behind + cluster color fill — two stacked proxy meshes
 			fillColor:   new Float32Array([color.r, color.g, color.b]),
-			ringColor:   new Float32Array([1, 1, 1])
+			ringColor:   new Float32Array([0.2, 0.2, 0.2])
 		};
 	});
 

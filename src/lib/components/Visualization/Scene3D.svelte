@@ -67,7 +67,7 @@
 				const isInDragged = draggedSet.has(i);
 				const isInHoveredCluster = hoveredCluster !== null && label === hoveredCluster;
 				if (!isInDragged && !isInHoveredCluster) {
-					tempColor.lerp(whiteColor, 0.8);
+					tempColor.lerp(whiteColor, 0.3);
 				}
 			}
 
@@ -114,12 +114,11 @@
 		const label = String(appState.labelsOfSelectedCat[idx] ?? '');
 		const info = appState.categoriesInfo['Label']?.[label];
 		const color = new THREE.Color(info?.color ?? '#cccccc');
-		// Slightly brighter so it pops above faded neighbors
-		color.lerp(new THREE.Color('#ffffff'), 0.3);
 
 		return {
 			position: new Float32Array([p[0], p[1], p[2]]),
-			color: new Float32Array([color.r, color.g, color.b])
+			color: new Float32Array([color.r, color.g, color.b]),
+			ringColor: new Float32Array([0.2, 0.2, 0.2])
 		};
 	});
 
@@ -200,8 +199,38 @@
 	</T.Points>
 {/if}
 
-<!-- Proxy point — always drawn on top, 3x size, cluster color -->
+<!-- Proxy ring (dark charcoal, slightly larger) -->
 {#if proxyData !== null}
+	<T.Points renderOrder={998}>
+		<T.BufferGeometry>
+			<T.BufferAttribute
+				args={[proxyData.position, 3]}
+				attach={({ parent, ref }) => {
+					(parent as any).setAttribute('position', ref);
+					return () => {};
+				}}
+			/>
+			<T.BufferAttribute
+				args={[proxyData.ringColor, 3]}
+				attach={({ parent, ref }) => {
+					(parent as any).setAttribute('color', ref);
+					return () => {};
+				}}
+			/>
+		</T.BufferGeometry>
+		<T.PointsMaterial
+			size={pointSize * 3.5}
+			vertexColors
+			sizeAttenuation={true}
+			transparent={true}
+			opacity={1.0}
+			map={circleTexture}
+			alphaTest={0.1}
+			depthTest={false}
+		/>
+	</T.Points>
+
+	<!-- Proxy fill (cluster color) -->
 	<T.Points
 		renderOrder={999}
 		onclick={() => appState.toggleClusterSelection(appState.selectedPointIdx!)}
