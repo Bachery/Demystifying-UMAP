@@ -47,6 +47,7 @@ export class AppState {
 
 	// 计算状态 (补全了这里)
 	isCalculating = $state(false);
+	isKnnDone = $state(false);
 	currentEpoch = $state(0);
 	totalEpochs = $state(500);
 	private worker: Worker | null = null;
@@ -175,7 +176,9 @@ export class AppState {
 		this.worker.onmessage = (e) => {
 			const { type, embedding, epoch } = e.data;
 			
-			if (type === 'UPDATE') {
+			if (type === 'KNN_DONE') {
+				this.isKnnDone = true;
+			} else if (type === 'UPDATE') {
 				// 计算中：实时更新最新的 embedding，但不存入 history
 				this.updateCurrentProjectionRealtime(embedding);
 				this.currentEpoch = epoch;
@@ -230,6 +233,7 @@ export class AppState {
 		this.worker.postMessage({ type: 'STOP' });
 
 		this.isCalculating = true;
+		this.isKnnDone = false;
 		this.currentEpoch = 0;
 		this.totalEpochs = this.params.nEpochs;
 

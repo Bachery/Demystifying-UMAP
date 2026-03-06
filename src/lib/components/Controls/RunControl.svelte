@@ -29,8 +29,9 @@
 				<span class="text-xs text-gray-500 font-medium uppercase tracking-wide">Initialization</span>
 				<div class="relative group">
 					<span class="text-[10px] text-gray-400 cursor-help border border-gray-300 rounded-full w-3.5 h-3.5 flex items-center justify-center shrink-0 select-none">?</span>
-					<div class="absolute bottom-full left-0 mb-1.5 w-56 text-xs text-white bg-gray-800 rounded p-2 shadow-lg hidden group-hover:block z-50 pointer-events-none">
-						Spectral uses pre-computed init files — only available for default datasets. Current uses the active 2D result as initialization.
+					<div class="absolute bottom-full left-0 mb-1.5 w-64 text-xs text-white bg-gray-800 rounded p-2 shadow-lg hidden group-hover:block z-50 pointer-events-none">
+						<em>Spectral</em> uses pre-computed init files and only available for default datasets. <br>
+						<em>Current</em> uses the active 2D result as initialization.
 						<div class="absolute top-full left-4 border-4 border-transparent border-t-gray-800"></div>
 					</div>
 				</div>
@@ -50,7 +51,7 @@
 						onclick={() => { if (!isDisabled) appState.initMethod = method; }}
 						disabled={isDisabled}
 					>
-						{method}
+						{method === 'pca' ? 'PCA' : method[0].toUpperCase() + method.slice(1)}
 					</button>
 				{/each}
 			</div>
@@ -59,7 +60,7 @@
 
 	{#if appState.isCalculating}
 		<div class="mb-3 flex justify-between items-center text-xs font-mono text-blue-600 animate-pulse">
-			<span>Optimizing...</span>
+			<span>{appState.isKnnDone ? 'Optimizing...' : 'Building KNN...'}</span>
 			<span>{appState.currentEpoch} / {appState.totalEpochs}</span>
 		</div>
 		<div class="w-full bg-gray-200 rounded-full h-1.5 mb-4 overflow-hidden">

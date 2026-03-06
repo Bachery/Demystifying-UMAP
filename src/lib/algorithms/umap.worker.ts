@@ -53,6 +53,7 @@ function initUMAP(data: number[][], params: UMAPParams, initPositions?: number[]
 	});
 
 	umap.initializeFit(data);
+	postMessage({ type: 'KNN_DONE' });
 
 	if (initPositions && initPositions.length > 0) {
 		// 必须原地修改 embedding，不能替换引用。
