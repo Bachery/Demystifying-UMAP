@@ -85,7 +85,7 @@
 	{#if appState.history.length > 0}
 		<div class="flex flex-col gap-1">
 			<span class="text-[9px] text-gray-400 uppercase tracking-wide font-semibold">History</span>
-			<div class="flex gap-1.5 overflow-x-auto pb-1">
+			<div class="flex gap-1.5 overflow-x-auto pb-1" onwheel={(e) => { e.preventDefault(); e.currentTarget.scrollLeft += e.deltaY; }}>
 				{#each appState.history as entry, i}
 					{@const isCurr = i === appState.currentProjectionIdx}
 					{@const isPrev = i === appState.previousProjectionIdx}
