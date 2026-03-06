@@ -152,10 +152,12 @@
 		if (appState.currentProjectionIdx === -1) return;
 		// $state.snapshot 返回普通数组（脱离 proxy），避免 map 中每次读取都经过 proxy 拦截
 		const raw = $state.snapshot(appState.history[appState.currentProjectionIdx].data) as number[][];
-		appState.history[appState.currentProjectionIdx].data = raw.map(row => {
+		const transformed = raw.map(row => {
 			const [nx, ny] = transform(row[0], row[1]);
 			return [nx, ny];
 		});
+		appState.history[appState.currentProjectionIdx].data = transformed;
+		appState.history[appState.currentProjectionIdx].thumbnail = appState.generateThumbnail(transformed);
 	}
 
 	function handleFlipX() {
