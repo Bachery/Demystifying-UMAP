@@ -7,6 +7,14 @@
 
 	const { size, invalidate } = useThrelte();
 
+	// Store interactivity context so we can tune raycaster threshold.
+	// Default threshold = 1 world unit is far too large with sizeAttenuation=false:
+	// as the user zooms in, the visual point radius shrinks (stays 6px) but the
+	// threshold stays fixed in world units, causing picks to trigger far off-center
+	// (the "upper-right offset" symptom). We recompute threshold reactively based
+	// on zoom so it always matches ~4px in world-space.
+	const interactivityCtx = interactivity();
+
 	type SceneAPI = {
 		fastMoveDraggedPoints: (renderIndices: number[], screenDx: number, screenDy: number) => { dataDx: number; dataDy: number };
 		setOrbitEnabled: (enabled: boolean) => void;
@@ -20,9 +28,6 @@
 		showGrid?: boolean;
 		onReady?: (api: SceneAPI) => void;
 	} = $props();
-
-	// Enable Threlte raycasting / pointer-event system for this Canvas
-	interactivity();
 
 	// Orthographic camera ref — updated when canvas resizes
 	let cameraRef = $state<THREE.OrthographicCamera | undefined>(undefined);
@@ -38,6 +43,11 @@
 	// Disabled while dragging points so OrbitControls doesn't pan the camera simultaneously
 	let orbitEnabled = $state(true);
 
+	// Reactive zoom — updated via OrbitControls change event so $effect can track it.
+	// We can't read cameraRef.zoom directly in $effect because THREE.js mutations
+	// don't trigger Svelte reactivity.
+	let cameraZoom = $state(1);
+
 	const HALF_WORLD = 110;
 
 	$effect(() => {
@@ -49,6 +59,24 @@
 		cameraRef.left   = -halfH * aspect;
 		cameraRef.right  =  halfH * aspect;
 		cameraRef.updateProjectionMatrix();
+	});
+
+	// Reactively keep raycaster threshold in sync with zoom and DPR.
+	// Points use sizeAttenuation=false (size=6 device pixels fixed), so the world-unit
+	// radius shrinks as zoom increases.
+	// THREE.js gl_PointSize is in device pixels, so visual radius = 3 device pixels.
+	// $size.height is CSS pixels → divide by devicePixelRatio to get world-per-device-px.
+	// Uses cameraZoom ($state) instead of cameraRef.zoom directly because OrbitControls
+	// mutates the THREE.js object in-place and Svelte won't track that.
+	$effect(() => {
+		const zoom = cameraZoom;
+		const dpr = typeof window !== 'undefined' ? (window.devicePixelRatio ?? 1) : 1;
+		const aspect = $size.width / $size.height;
+		const halfH = HALF_WORLD / Math.min(1, aspect);
+		// world units per device pixel
+		const worldPerDevPx = (2 * halfH) / ($size.height * dpr * zoom);
+		// threshold = visual radius (3 dev px) + 0.5 dev px tolerance
+		interactivityCtx.raycaster.params.Points = { threshold: worldPerDevPx * 3.5 };
 	});
 
 	// ==========================================
@@ -445,6 +473,7 @@
 		enableRotate={false}
 		enableZoom={true}
 		mouseButtons={{ LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN }}
+		on:change={() => { if (cameraRef) cameraZoom = cameraRef.zoom; }}
 	/>
 </T.OrthographicCamera>
 
@@ -494,7 +523,7 @@
 			/>
 		</T.BufferGeometry>
 		<T.PointsMaterial
-			size={25}
+			size={28}
 			vertexColors
 			sizeAttenuation={false}
 			transparent={true}
@@ -505,12 +534,9 @@
 		/>
 	</T.Points>
 
-	<!-- Proxy fill (cluster color, 2x size = 8px) — drawn on top of ring -->
-	<T.Points
-		renderOrder={999}
-		onclick={() => appState.toggleClusterSelection(appState.selectedPointIdx!)}
-		onpointermissed={handleMissed}
-	>
+	<!-- Proxy fill (cluster color) — purely visual, no interaction handlers.
+	     Clicks pass through to the main T.Points below to avoid double-toggling. -->
+	<T.Points renderOrder={999}>
 		<T.BufferGeometry>
 			<T.BufferAttribute
 				args={[proxyData2D.position, 3]}
