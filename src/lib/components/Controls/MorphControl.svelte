@@ -35,7 +35,7 @@
 
 		<!-- Prev -->
 		<div class="flex flex-col items-center gap-1 w-16 shrink-0">
-			<div class="w-14 h-14 rounded border-2 border-dashed border-blue-400 bg-white overflow-hidden shadow-sm">
+			<div class="w-16 h-16 rounded border-2 border-dashed border-blue-400 bg-white overflow-hidden shadow-sm">
 				{#if appState.previousProjectionIdx !== -1 && appState.history[appState.previousProjectionIdx]?.thumbnail}
 					<img src={appState.history[appState.previousProjectionIdx].thumbnail} class="w-full h-full object-cover" alt="prev" />
 				{:else if appState.previousProjectionIdx !== -1}
@@ -50,13 +50,13 @@
 		</div>
 
 		<!-- Slider -->
-		<div class="flex-[0.5] flex flex-col justify-center pt-1 min-w-0">
+		<div class="flex-[0.9] flex flex-col justify-center pt-1 min-w-0">
 			<input
 				type="range"
 				bind:value={appState.animationProgress}
 				min={0} max={1} step={0.01}
 				disabled={appState.previousProjectionIdx === -1}
-				class="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-purple-600 hover:accent-purple-700 disabled:opacity-50"
+				class="w-full h-1.5 bg-gray-300 rounded-lg appearance-none cursor-pointer accent-purple-500 hover:accent-purple-700 disabled:opacity-50"
 			/>
 			<div class="flex justify-between mt-1 px-1">
 				<span class="text-[9px] text-gray-400">Prev</span>
@@ -66,7 +66,7 @@
 
 		<!-- Curr -->
 		<div class="flex flex-col items-center gap-1 w-16 shrink-0">
-			<div class="w-14 h-14 rounded border-2 border-purple-500 bg-white overflow-hidden shadow-md">
+			<div class="w-16 h-16 rounded border-2 border-purple-500 bg-white overflow-hidden shadow-md">
 				{#if appState.currentProjectionIdx !== -1 && appState.history[appState.currentProjectionIdx]?.thumbnail}
 					<img src={appState.history[appState.currentProjectionIdx].thumbnail} class="w-full h-full object-cover" alt="curr" />
 				{:else if appState.currentProjectionIdx !== -1}
