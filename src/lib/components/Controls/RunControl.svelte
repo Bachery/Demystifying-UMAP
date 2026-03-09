@@ -29,7 +29,7 @@
 				<span class="text-xs text-gray-500 font-medium uppercase tracking-wide">Initialization</span>
 				<div class="relative group">
 					<span class="text-[10px] text-gray-400 cursor-help border border-gray-300 rounded-full w-3.5 h-3.5 flex items-center justify-center shrink-0 select-none">?</span>
-					<div class="absolute bottom-full left-0 mb-1.5 w-64 text-xs text-white bg-gray-800 rounded p-2 shadow-lg hidden group-hover:block z-50 pointer-events-none">
+					<div class="absolute bottom-full -left-3.5 mb-2 w-60 text-xs text-white bg-gray-800 rounded p-2 shadow-lg hidden group-hover:block z-50 pointer-events-none">
 						<em>Spectral</em> uses pre-computed init files and only available for default datasets. <br>
 						<em>Current</em> uses the active 2D result as initialization.
 						<div class="absolute top-full left-4 border-4 border-transparent border-t-gray-800"></div>
