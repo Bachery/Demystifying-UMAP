@@ -13,7 +13,7 @@
 		<p class="mt-1 text-xs text-gray-400">Configure & Steer UMAP</p>
 	</div>
 
-	<div class="custom-scrollbar flex flex-1 flex-col gap-1.5 overflow-y-auto p-4">
+	<div class="custom-scrollbar min-h-0 flex-1 overflow-x-hidden overflow-y-auto p-5">
 		<SidebarComponent title="Hyperparameters">
 			<Slider
 				label="Neighbors"
@@ -64,3 +64,19 @@
 
 	<RunControl />
 </div>
+
+<style>
+	.custom-scrollbar::-webkit-scrollbar {
+		width: 6px;
+	}
+	.custom-scrollbar::-webkit-scrollbar-track {
+		background: transparent;
+	}
+	.custom-scrollbar::-webkit-scrollbar-thumb {
+		background-color: rgba(156, 163, 175, 0.4);
+		border-radius: 20px;
+	}
+	.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+		background-color: rgba(156, 163, 175, 0.7);
+	}
+</style>
