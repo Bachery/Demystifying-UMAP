@@ -32,7 +32,7 @@
 		'Two-Moons':       { num_samples: 5000, noise: 0.17 },
 		'Swiss-Roll':      { num_samples: 5000, noise: 1.0 },
 		'Uniform-Strip':   { num_samples: 5000, length: 15.0, width: 1.0 },
-		'Torus-Surface':   { num_samples: 5000, ring_radius: 10.0, tube_radius: 8.0 },
+		'Torus-Surface':   { num_samples: 5000, ring_radius: 10.0, tube_radius: 7.9 },
 		'S-Curve':         { num_samples: 5000, noise: 0.33 },
 		'Connected-Blobs': { bridge_samples: 500, cov_bridge: 0.7 },
 		// Gaussian-Blobs 特殊处理，不放在这里
