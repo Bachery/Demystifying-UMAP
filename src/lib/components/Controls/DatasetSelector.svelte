@@ -51,7 +51,7 @@
 		'Density-Contrast':		'<b>Metric Distortion:</b> Two clusters with significantly different densities. UMAP normalizes local connectivity, causing sparse and dense clusters to appear visually similar in size. Density cues are often lost.',
 		'Distance-Contrast':	'<b>Global Distance Distortion:</b> Clusters with varying inter-cluster distances. UMAP is not isometric; global distances in the 2D embedding do not linearly reflect the absolute separation in 3D space.',
 		'Connected-Blobs':		'<b>Case 5 (Density Fragility):</b> Dense clusters linked by a sparse bridge. A stress test for density sensitivity: surprisingly, increasing <code>n_neighbors</code> (global optimization) may cause the weak bridge to snap and be absorbed by the dense clusters.',
-		'Gaussian-Blobs':		'<b>Baseline:</b> Standard Gaussian clusters. Use this to verify basic cluster separation and to test how initialization affects the relative positioning of distinct groups.',
+		'Gaussian-Blobs':		'Standard Gaussian clusters. Use this to verify basic cluster separation and to test how initialization affects the relative positioning of distinct groups.',
 	};
 
 	// ==========================================
