@@ -14,7 +14,7 @@
 		<p class="text-xs text-gray-400 mt-1">Configure & Steer UMAP</p>
 	</div>
 
-	<div class="p-5 flex-1 overflow-y-auto custom-scrollbar flex flex-col gap-2">
+	<div class="p-4 flex-1 overflow-y-auto custom-scrollbar flex flex-col gap-1.5">
 
 		<SidebarComponent title="Hyperparameters">
 			<Slider 
@@ -48,11 +48,12 @@
 				
 				{#if appState.manualMode}
 					<div class="mt-2 text-xs text-blue-600 bg-blue-100/50 p-2 rounded">
-						<p class="font-bold mb-1">How to steer:</p>
+						<p class="font-bold mb-1">How to steer in 2D Panel:</p>
 						<ul class="list-disc list-inside space-y-0.5 opacity-80">
-							<li>Drag points in 2D view</li>
-							<li>Click "Re-run UMAP" to inject priors</li>
-							<li>Algorithm optimizes with your constraints</li>
+							<li><strong>Click</strong> a point to select/deselect its cluster</li>
+							<li><strong>Hold 'Shift'</strong> to activate box selection</li>
+							<li><strong>Drag</strong> selected points to new positions</li>
+							<li>Click "Re-run" to inject priors</li>
 						</ul>
 					</div>
 				{/if}
@@ -61,7 +62,7 @@
 
 		<SidebarComponent title="Analysis & Compare" initiallyExpanded={true}>
 			<MorphControl />
-			<div class="mt-3 pt-3 border-t border-gray-100">
+			<div class="mt-2 pt-2 border-t border-gray-100">
 				<Toggle 
 					label="Highlight Unstable Points" 
 					bind:checked={appState.ifHighlightUnstablePoints} 

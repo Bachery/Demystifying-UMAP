@@ -2,7 +2,7 @@
 	let { label, value = $bindable(), min, max, step = 1, disabled = false } = $props();
 </script>
 
-<div class="flex flex-col gap-1 mb-3">
+<div class="flex flex-col gap-1 mb-2">
 	<div class="flex justify-between items-center">
 		<label for="Slider-input-{label}" class="text-xs font-medium text-gray-500 uppercase tracking-wide">{label}</label>
 		<input 
