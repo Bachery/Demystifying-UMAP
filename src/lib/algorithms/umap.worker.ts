@@ -10,39 +10,60 @@ export type UMAPParams = {
 	spread?: number;
 };
 
-export type WorkerMessage = 
-	| { type: 'INIT'; data: number[][]; params: UMAPParams; initPositions?: number[][] }
-	| { type: 'STOP' }
+export type WorkerMessage =
+	| {
+			type: 'INIT';
+			runId: number;
+			data: number[][];
+			params: UMAPParams;
+			initPositions?: number[][];
+	  }
+	| { type: 'STOP'; runId: number }
 	| { type: 'STEP' }; // 请求跑一步
+
+export type WorkerResponseMessage =
+	| { type: 'KNN_DONE'; runId: number }
+	| { type: 'UPDATE'; runId: number; epoch: number }
+	| { type: 'FINISHED'; runId: number; embedding: number[][] };
+
+type UMAPEmbeddingHandle = {
+	embedding: number[][];
+};
 
 let umap: UMAP | null = null;
 let currentEpoch = 0;
 let totalEpochs = 0;
 let isRunning = false;
 let iterationsPerBatch = 50; // dynamically set based on data size
+let activeRunId = 0;
 
 self.onmessage = (e: MessageEvent<WorkerMessage>) => {
 	const msg = e.data;
 
 	switch (msg.type) {
 		case 'INIT':
-			initUMAP(msg.data, msg.params, msg.initPositions);
+			initUMAP(msg.runId, msg.data, msg.params, msg.initPositions);
 			break;
 		case 'STOP':
-			isRunning = false;
+			if (msg.runId === activeRunId) {
+				isRunning = false;
+				activeRunId = 0;
+				umap = null;
+			}
 			break;
 		case 'STEP':
 			if (isRunning && umap) {
-				runEpochs();
+				runEpochs(activeRunId);
 			}
 			break;
 	}
 };
 
-function initUMAP(data: number[][], params: UMAPParams, initPositions?: number[][]) {
+function initUMAP(runId: number, data: number[][], params: UMAPParams, initPositions?: number[][]) {
 	currentEpoch = 0;
 	totalEpochs = params.nEpochs || 500;
 	isRunning = true;
+	activeRunId = runId;
 
 	// Adaptive batch size: smaller datasets benefit from larger batches (less setTimeout overhead),
 	// larger datasets need smaller batches to keep the UI responsive.
@@ -55,11 +76,11 @@ function initUMAP(data: number[][], params: UMAPParams, initPositions?: number[]
 		nNeighbors: params.nNeighbors,
 		minDist: params.minDist,
 		nComponents: params.nComponents,
-		spread: params.spread || 1.0,
+		spread: params.spread || 1.0
 	});
 
 	umap.initializeFit(data);
-	postMessage({ type: 'KNN_DONE' });
+	postMessage({ type: 'KNN_DONE', runId } satisfies WorkerResponseMessage);
 
 	if (initPositions && initPositions.length > 0) {
 		// 必须原地修改 embedding，不能替换引用。
@@ -67,28 +88,36 @@ function initUMAP(data: number[][], params: UMAPParams, initPositions?: number[]
 		// step() 通过 headEmbedding 就地更新坐标。直接赋值 umap.embedding = newArray
 		// 会断开该引用，导致 step() 在旧随机初始化上优化而 getEmbedding() 永远返回
 		// 未被优化的初始值。
-		const embedding = (umap as any).embedding as number[][];
+		const embedding = (umap as unknown as UMAPEmbeddingHandle).embedding;
 		const n = Math.min(embedding.length, initPositions.length);
 		for (let i = 0; i < n; i++) {
 			embedding[i][0] = initPositions[i][0];
 			embedding[i][1] = initPositions[i][1];
 		}
 	}
-	
+
 	// 开始循环
-	runEpochs();
+	runEpochs(runId);
 }
 
-function runEpochs() {
-	if (!umap || !isRunning) return;
+function runEpochs(runId: number) {
+	if (!umap || !isRunning || runId !== activeRunId) return;
 
 	for (let i = 0; i < iterationsPerBatch; i++) {
+		if (runId !== activeRunId || !isRunning || !umap) return;
+
 		if (currentEpoch >= totalEpochs) {
 			isRunning = false;
-			postMessage({ type: 'FINISHED', embedding: umap.getEmbedding() });
+			activeRunId = 0;
+			postMessage({
+				type: 'FINISHED',
+				runId,
+				embedding: umap.getEmbedding()
+			} satisfies WorkerResponseMessage);
+			umap = null;
 			return;
 		}
-		
+
 		umap.step();
 		currentEpoch++;
 	}
@@ -96,10 +125,9 @@ function runEpochs() {
 	// 渲染还是很吃时间，不发中间结果，只发初始化和最终结果
 	postMessage({
 		type: 'UPDATE',
-		// embedding: umap.getEmbedding(),
-		epoch: currentEpoch,
-		isFinished: false
-	});
+		runId,
+		epoch: currentEpoch
+	} satisfies WorkerResponseMessage);
 
-	setTimeout(runEpochs, 0); 
+	setTimeout(() => runEpochs(runId), 0);
 }

@@ -12,6 +12,15 @@
 	// Excess threshold causes the closest-by-depth neighbour to be picked instead
 	// of the point under the cursor, producing an apparent upper-right offset.
 	const interactivityCtx = interactivity();
+
+	type IndexedPointerEvent = {
+		index?: number;
+	};
+
+	type AttributeAttachContext = {
+		parent: unknown;
+		ref: THREE.BufferAttribute;
+	};
 	$effect(() => {
 		interactivityCtx.raycaster.params.Points = {
 			threshold: appState.dataSize > 10000 ? 0.15 : 0.25
@@ -32,12 +41,12 @@
 	const _tc3 = new THREE.Color();
 	let rgbCache3D = $derived.by(() => {
 		const catInfo = appState.categoriesInfo['Label'] || {};
-		const map = new Map<string, { r: number; g: number; b: number }>();
+		const cache: Record<string, { r: number; g: number; b: number }> = {};
 		for (const [label, info] of Object.entries(catInfo)) {
-			_tc3.set((info as any).color ?? '#cccccc');
-			map.set(label, { r: _tc3.r, g: _tc3.g, b: _tc3.b });
+			_tc3.set(info.color || '#cccccc');
+			cache[label] = { r: _tc3.r, g: _tc3.g, b: _tc3.b };
 		}
-		return map;
+		return cache;
 	});
 	const _defaultRgb3D = { r: 0.8, g: 0.8, b: 0.8 };
 
@@ -49,27 +58,32 @@
 
 		const colorArray = new Float32Array(appState.dataSize * 3);
 		const selectedIdx = appState.selectedPointIdx;
-		const draggedSet = new Set(appState.draggedPointsIdx);
-		const unstableSet = new Set(appState.unstablePointsIdx);
+		const draggedLookup = Object.fromEntries(
+			appState.draggedPointsIdx.map((idx) => [idx, true] as const)
+		);
+		const unstableLookup = Object.fromEntries(
+			appState.unstablePointsIdx.map((idx) => [idx, true] as const)
+		);
 		const hasUnstable = appState.ifHighlightUnstablePoints;
 		const labels = appState.labelsOfSelectedCat;
 
 		// Fading is active only when something is hovered OR something is selected
-		const hasAnySelection = selectedIdx !== null || draggedSet.size > 0;
+		const hasAnySelection = selectedIdx !== null || appState.draggedPointsIdx.length > 0;
 		const needsFade = hasUnstable || hasAnySelection;
 
 		// Which cluster is currently being hovered?
-		const hoveredCluster =
-			selectedIdx !== null ? String(labels[selectedIdx] ?? '') : null;
+		const hoveredCluster = selectedIdx !== null ? String(labels[selectedIdx] ?? '') : null;
 
 		for (let i = 0; i < appState.dataSize; i++) {
 			const label = String(labels[i] ?? '');
-			const c = rgbCache3D.get(label) ?? _defaultRgb3D;
-			let r = c.r, g = c.g, b = c.b;
+			const c = rgbCache3D[label] ?? _defaultRgb3D;
+			let r = c.r,
+				g = c.g,
+				b = c.b;
 
 			if (needsFade) {
-				const isInUnstable       = hasUnstable && unstableSet.has(i);
-				const isInDragged        = draggedSet.has(i);
+				const isInUnstable = hasUnstable && Boolean(unstableLookup[i]);
+				const isInDragged = Boolean(draggedLookup[i]);
 				const isInHoveredCluster = hoveredCluster !== null && label === hoveredCluster;
 				if (!isInUnstable && !isInDragged && !isInHoveredCluster) {
 					r = r + (1 - r) * 0.3;
@@ -78,7 +92,7 @@
 				}
 			}
 
-			colorArray[i * 3]     = r;
+			colorArray[i * 3] = r;
 			colorArray[i * 3 + 1] = g;
 			colorArray[i * 3 + 2] = b;
 		}
@@ -132,7 +146,7 @@
 	// ==========================================
 	// 6. Event handlers
 	// ==========================================
-	function handlePointerMove(e: any) {
+	function handlePointerMove(e: IndexedPointerEvent) {
 		if (e.index !== undefined) {
 			appState.selectedPointIdx = e.index;
 			document.body.style.cursor = 'pointer';
@@ -144,7 +158,7 @@
 		document.body.style.cursor = 'default';
 	}
 
-	function handleClick(e: any) {
+	function handleClick(e: IndexedPointerEvent) {
 		if (e.index !== undefined) {
 			appState.toggleClusterSelection(e.index);
 		}
@@ -152,6 +166,13 @@
 
 	function handleMissed() {
 		appState.draggedPointsIdx = [];
+	}
+
+	function attachAttribute(name: 'position' | 'color') {
+		return ({ parent, ref }: AttributeAttachContext) => {
+			(parent as THREE.BufferGeometry).setAttribute(name, ref);
+			return () => {};
+		};
 	}
 </script>
 
@@ -179,20 +200,8 @@
 		onpointermissed={handleMissed}
 	>
 		<T.BufferGeometry>
-			<T.BufferAttribute
-				args={[positions, 3]}
-				attach={({ parent, ref }) => {
-					(parent as any).setAttribute('position', ref);
-					return () => {};
-				}}
-			/>
-			<T.BufferAttribute
-				args={[colors, 3]}
-				attach={({ parent, ref }) => {
-					(parent as any).setAttribute('color', ref);
-					return () => {};
-				}}
-			/>
+			<T.BufferAttribute args={[positions, 3]} attach={attachAttribute('position')} />
+			<T.BufferAttribute args={[colors, 3]} attach={attachAttribute('color')} />
 		</T.BufferGeometry>
 		<T.PointsMaterial
 			size={pointSize}
@@ -210,20 +219,8 @@
 {#if proxyData !== null}
 	<T.Points renderOrder={998}>
 		<T.BufferGeometry>
-			<T.BufferAttribute
-				args={[proxyData.position, 3]}
-				attach={({ parent, ref }) => {
-					(parent as any).setAttribute('position', ref);
-					return () => {};
-				}}
-			/>
-			<T.BufferAttribute
-				args={[proxyData.ringColor, 3]}
-				attach={({ parent, ref }) => {
-					(parent as any).setAttribute('color', ref);
-					return () => {};
-				}}
-			/>
+			<T.BufferAttribute args={[proxyData.position, 3]} attach={attachAttribute('position')} />
+			<T.BufferAttribute args={[proxyData.ringColor, 3]} attach={attachAttribute('color')} />
 		</T.BufferGeometry>
 		<T.PointsMaterial
 			size={pointSize * 3.5}
@@ -244,20 +241,8 @@
 		onpointermissed={handleMissed}
 	>
 		<T.BufferGeometry>
-			<T.BufferAttribute
-				args={[proxyData.position, 3]}
-				attach={({ parent, ref }) => {
-					(parent as any).setAttribute('position', ref);
-					return () => {};
-				}}
-			/>
-			<T.BufferAttribute
-				args={[proxyData.color, 3]}
-				attach={({ parent, ref }) => {
-					(parent as any).setAttribute('color', ref);
-					return () => {};
-				}}
-			/>
+			<T.BufferAttribute args={[proxyData.position, 3]} attach={attachAttribute('position')} />
+			<T.BufferAttribute args={[proxyData.color, 3]} attach={attachAttribute('color')} />
 		</T.BufferGeometry>
 		<T.PointsMaterial
 			size={pointSize * 3}

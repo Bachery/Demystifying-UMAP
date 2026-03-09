@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { appState } from '$lib/stores/app.svelte';
+	import type { UMAPParams } from '$lib/algorithms/umap.worker';
 
-	function formatParams(params: any) {
+	function formatParams(params?: UMAPParams) {
 		if (!params) return 'N/A';
 		return `NN:${params.nNeighbors} | Ep:${params.nEpochs}`;
 	}
@@ -16,66 +17,97 @@
 		{ label: 'minDist', prev: prevParams?.minDist, curr: currParams?.minDist },
 		{ label: 'Spread', prev: prevParams?.spread ?? 1.0, curr: currParams?.spread ?? 1.0 },
 		{ label: 'Epochs', prev: prevParams?.nEpochs, curr: currParams?.nEpochs },
-		{ label: 'Steered', prev: prevEntry?.steered ?? false, curr: currEntry?.steered ?? false, isBool: true as const },
+		{
+			label: 'Steered',
+			prev: prevEntry?.steered ?? false,
+			curr: currEntry?.steered ?? false,
+			isBool: true as const
+		}
 	]);
 </script>
 
-<div class="bg-gray-50/80 rounded-lg p-3 border border-gray-200/60 shadow-inner flex flex-col gap-3">
-
+<div
+	class="flex flex-col gap-3 rounded-lg border border-gray-200/60 bg-gray-50/80 p-3 shadow-inner"
+>
 	<!-- Title row -->
-	<div class="flex justify-between items-center">
-		<h4 class="text-xs font-bold text-gray-500 uppercase tracking-wide">Result Comparison</h4>
-		<span class="text-[10px] text-gray-400 font-mono">
+	<div class="flex items-center justify-between">
+		<h4 class="text-xs font-bold tracking-wide text-gray-500 uppercase">Result Comparison</h4>
+		<span class="font-mono text-[10px] text-gray-400">
 			{Math.round(appState.animationProgress * 100)}%
 		</span>
 	</div>
 
 	<!-- Prev thumbnail + slider + Curr thumbnail -->
 	<div class="flex items-center gap-2">
-
 		<!-- Prev -->
-		<div class="flex flex-col items-center gap-1 w-16 shrink-0">
-			<div class="w-16 h-16 rounded border-2 border-dashed border-blue-400 bg-white overflow-hidden shadow-sm">
+		<div class="flex w-16 shrink-0 flex-col items-center gap-1">
+			<div
+				class="h-16 w-16 overflow-hidden rounded border-2 border-dashed border-blue-400 bg-white shadow-sm"
+			>
 				{#if appState.previousProjectionIdx !== -1 && appState.history[appState.previousProjectionIdx]?.thumbnail}
-					<img src={appState.history[appState.previousProjectionIdx].thumbnail} class="w-full h-full object-cover" alt="prev" />
+					<img
+						src={appState.history[appState.previousProjectionIdx].thumbnail}
+						class="h-full w-full object-cover"
+						alt="prev"
+					/>
 				{:else if appState.previousProjectionIdx !== -1}
-					<div class="w-full h-full bg-blue-100 text-[8px] flex items-center justify-center text-blue-400">PREV</div>
+					<div
+						class="flex h-full w-full items-center justify-center bg-blue-100 text-[8px] text-blue-400"
+					>
+						PREV
+					</div>
 				{:else}
-					<div class="w-full h-full flex items-center justify-center text-gray-300 text-[8px]">None</div>
+					<div class="flex h-full w-full items-center justify-center text-[8px] text-gray-300">
+						None
+					</div>
 				{/if}
 			</div>
-			<span class="text-[9px] text-gray-400 font-mono text-center leading-tight truncate w-full">
+			<span class="w-full truncate text-center font-mono text-[9px] leading-tight text-gray-400">
 				{appState.previousProjectionIdx !== -1 ? `#${appState.previousProjectionIdx}` : '–'}
 			</span>
 		</div>
 
 		<!-- Slider -->
-		<div class="flex-[0.9] flex flex-col justify-center pt-1 min-w-0">
+		<div class="flex min-w-0 flex-[0.9] flex-col justify-center pt-1">
 			<input
 				type="range"
 				bind:value={appState.animationProgress}
-				min={0} max={1} step={0.01}
+				min={0}
+				max={1}
+				step={0.01}
 				disabled={appState.previousProjectionIdx === -1}
-				class="w-full h-1.5 bg-gray-300 rounded-lg appearance-none cursor-pointer accent-purple-500 hover:accent-purple-700 disabled:opacity-50"
+				class="h-1.5 w-full cursor-pointer appearance-none rounded-lg bg-gray-300 accent-purple-500 hover:accent-purple-700 disabled:opacity-50"
 			/>
-			<div class="flex justify-between mt-1 px-1">
+			<div class="mt-1 flex justify-between px-1">
 				<span class="text-[9px] text-gray-400">Prev</span>
 				<span class="text-[9px] text-gray-400">Curr</span>
 			</div>
 		</div>
 
 		<!-- Curr -->
-		<div class="flex flex-col items-center gap-1 w-16 shrink-0">
-			<div class="w-16 h-16 rounded border-2 border-purple-500 bg-white overflow-hidden shadow-md">
+		<div class="flex w-16 shrink-0 flex-col items-center gap-1">
+			<div class="h-16 w-16 overflow-hidden rounded border-2 border-purple-500 bg-white shadow-md">
 				{#if appState.currentProjectionIdx !== -1 && appState.history[appState.currentProjectionIdx]?.thumbnail}
-					<img src={appState.history[appState.currentProjectionIdx].thumbnail} class="w-full h-full object-cover" alt="curr" />
+					<img
+						src={appState.history[appState.currentProjectionIdx].thumbnail}
+						class="h-full w-full object-cover"
+						alt="curr"
+					/>
 				{:else if appState.currentProjectionIdx !== -1}
-					<div class="w-full h-full bg-purple-100 text-[8px] flex items-center justify-center text-purple-600">CURR</div>
+					<div
+						class="flex h-full w-full items-center justify-center bg-purple-100 text-[8px] text-purple-600"
+					>
+						CURR
+					</div>
 				{:else}
-					<div class="w-full h-full flex items-center justify-center text-gray-300 text-[8px]">Empty</div>
+					<div class="flex h-full w-full items-center justify-center text-[8px] text-gray-300">
+						Empty
+					</div>
 				{/if}
 			</div>
-			<span class="text-[9px] text-gray-500 font-bold font-mono text-center leading-tight truncate w-full">
+			<span
+				class="w-full truncate text-center font-mono text-[9px] leading-tight font-bold text-gray-500"
+			>
 				{appState.currentProjectionIdx !== -1 ? `#${appState.currentProjectionIdx}` : '–'}
 			</span>
 		</div>
@@ -84,17 +116,24 @@
 	<!-- History strip -->
 	{#if appState.history.length > 0}
 		<div class="flex flex-col gap-1">
-			<span class="text-[9px] text-gray-400 uppercase tracking-wide font-semibold">History</span>
-			<div class="flex gap-1.5 overflow-x-auto pb-1" onwheel={(e) => { e.preventDefault(); e.currentTarget.scrollLeft += e.deltaY; }}>
-				{#each appState.history as entry, i}
+			<span class="text-[9px] font-semibold tracking-wide text-gray-400 uppercase">History</span>
+			<div
+				class="flex gap-1.5 overflow-x-auto pb-1"
+				onwheel={(e) => {
+					e.preventDefault();
+					e.currentTarget.scrollLeft += e.deltaY;
+				}}
+			>
+				{#each appState.history as entry, i (i)}
 					{@const isCurr = i === appState.currentProjectionIdx}
 					{@const isPrev = i === appState.previousProjectionIdx}
 					<button
 						onclick={() => appState.selectHistoryEntry(i)}
-						class="shrink-0 flex flex-col items-center gap-0.5 group"
+						class="group flex shrink-0 flex-col items-center gap-0.5"
 						title="Run #{i} — {formatParams(entry.params)}{entry.steered ? ' [Steered]' : ''}"
 					>
-						<div class="relative w-9 h-9 rounded overflow-hidden bg-white transition-all"
+						<div
+							class="relative h-9 w-9 overflow-hidden rounded bg-white transition-all"
 							class:border-2={isCurr || isPrev}
 							class:border={!isCurr && !isPrev}
 							class:border-purple-500={isCurr}
@@ -105,20 +144,29 @@
 							class:shadow-md={isCurr}
 						>
 							{#if entry.thumbnail}
-								<img src={entry.thumbnail} class="w-full h-full object-cover" alt="#{i}" />
+								<img src={entry.thumbnail} class="h-full w-full object-cover" alt="#{i}" />
 							{:else}
-								<div class="w-full h-full flex items-center justify-center text-gray-300 text-[8px] bg-gray-50">#{i}</div>
+								<div
+									class="flex h-full w-full items-center justify-center bg-gray-50 text-[8px] text-gray-300"
+								>
+									#{i}
+								</div>
 							{/if}
 							{#if entry.steered}
-								<div class="absolute bottom-0 right-0 text-[6px] bg-orange-400 text-white px-0.5 rounded-tl leading-tight">✎</div>
+								<div
+									class="absolute right-0 bottom-0 rounded-tl bg-orange-400 px-0.5 text-[6px] leading-tight text-white"
+								>
+									✎
+								</div>
 							{/if}
 						</div>
-						<span class="text-[7px] font-mono leading-none"
+						<span
+							class="font-mono text-[7px] leading-none"
 							class:text-purple-600={isCurr}
 							class:font-bold={isCurr}
 							class:text-blue-400={isPrev && !isCurr}
-							class:text-gray-400={!isCurr && !isPrev}
-						>#{i}</span>
+							class:text-gray-400={!isCurr && !isPrev}>#{i}</span
+						>
 					</button>
 				{/each}
 			</div>
@@ -127,25 +175,62 @@
 
 	<!-- Params comparison -->
 	{#if appState.previousProjectionIdx !== -1}
-		<div class="bg-white/50 rounded border border-gray-100 overflow-hidden">
-			<div class="grid grid-cols-[auto_1fr_1fr] text-[9px] font-mono">
-				<div class="px-2 py-0.5 text-gray-400 font-sans font-semibold uppercase tracking-wide bg-gray-50/80 border-b border-gray-100"></div>
-				<div class="px-2 py-0.5 text-blue-400 font-bold text-center border-b border-l border-gray-100 bg-gray-50/80">#{appState.previousProjectionIdx}</div>
-				<div class="px-2 py-0.5 text-purple-600 font-bold text-center border-b border-l border-gray-100 bg-gray-50/80">#{appState.currentProjectionIdx}</div>
+		<div class="overflow-hidden rounded border border-gray-100 bg-white/50">
+			<div class="grid grid-cols-[auto_1fr_1fr] font-mono text-[9px]">
+				<div
+					class="border-b border-gray-100 bg-gray-50/80 px-2 py-0.5 font-sans font-semibold tracking-wide text-gray-400 uppercase"
+				></div>
+				<div
+					class="border-b border-l border-gray-100 bg-gray-50/80 px-2 py-0.5 text-center font-bold text-blue-400"
+				>
+					#{appState.previousProjectionIdx}
+				</div>
+				<div
+					class="border-b border-l border-gray-100 bg-gray-50/80 px-2 py-0.5 text-center font-bold text-purple-600"
+				>
+					#{appState.currentProjectionIdx}
+				</div>
 
-				{#each paramRows as row}
+				{#each paramRows as row (row.label)}
 					{@const changed = row.prev !== row.curr}
-					<div class="px-2 py-0.5 text-gray-400 font-sans" class:bg-yellow-50={changed}>{row.label}</div>
+					<div class="px-2 py-0.5 font-sans text-gray-400" class:bg-yellow-50={changed}>
+						{row.label}
+					</div>
 					{#if row.isBool}
-						<div class="px-2 py-0.5 text-center border-l border-gray-100" class:bg-yellow-50={changed} class:text-orange-500={row.prev} class:text-gray-300={!row.prev}>{row.prev ? '✎ yes' : '–'}</div>
-						<div class="px-2 py-0.5 text-center border-l border-gray-100" class:bg-yellow-50={changed} class:text-orange-500={row.curr} class:text-gray-300={!row.curr}>{row.curr ? '✎ yes' : '–'}</div>
+						<div
+							class="border-l border-gray-100 px-2 py-0.5 text-center"
+							class:bg-yellow-50={changed}
+							class:text-orange-500={row.prev}
+							class:text-gray-300={!row.prev}
+						>
+							{row.prev ? '✎ yes' : '–'}
+						</div>
+						<div
+							class="border-l border-gray-100 px-2 py-0.5 text-center"
+							class:bg-yellow-50={changed}
+							class:text-orange-500={row.curr}
+							class:text-gray-300={!row.curr}
+						>
+							{row.curr ? '✎ yes' : '–'}
+						</div>
 					{:else}
-						<div class="px-2 py-0.5 text-blue-400 text-center border-l border-gray-100" class:bg-yellow-50={changed} class:font-bold={changed}>{row.prev ?? '–'}</div>
-						<div class="px-2 py-0.5 text-purple-600 text-center border-l border-gray-100" class:bg-yellow-50={changed} class:font-bold={changed}>{row.curr ?? '–'}</div>
+						<div
+							class="border-l border-gray-100 px-2 py-0.5 text-center text-blue-400"
+							class:bg-yellow-50={changed}
+							class:font-bold={changed}
+						>
+							{row.prev ?? '–'}
+						</div>
+						<div
+							class="border-l border-gray-100 px-2 py-0.5 text-center text-purple-600"
+							class:bg-yellow-50={changed}
+							class:font-bold={changed}
+						>
+							{row.curr ?? '–'}
+						</div>
 					{/if}
 				{/each}
 			</div>
 		</div>
 	{/if}
-
 </div>

@@ -14,7 +14,10 @@ function normalize(v: Float64Array): Float64Array {
 	for (let i = 0; i < v.length; i++) n += v[i] * v[i];
 	n = Math.sqrt(n);
 	const out = new Float64Array(v.length);
-	if (n === 0) { out.set(v); return out; }
+	if (n === 0) {
+		out.set(v);
+		return out;
+	}
 	for (let i = 0; i < v.length; i++) out[i] = v[i] / n;
 	return out;
 }

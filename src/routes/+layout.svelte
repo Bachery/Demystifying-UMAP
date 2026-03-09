@@ -4,7 +4,6 @@
 	import favicon from '/static/favicon/favicon.svg';
 
 	let { children } = $props();
-
 </script>
 
 <svelte:head><link rel="icon" href={favicon} /></svelte:head>

@@ -15,11 +15,29 @@
 	// on zoom so it always matches ~4px in world-space.
 	const interactivityCtx = interactivity();
 
+	type IndexedPointerEvent = {
+		index?: number;
+	};
+
+	type AttributeAttachContext = {
+		parent: unknown;
+		ref: THREE.BufferAttribute;
+	};
+
 	type SceneAPI = {
-		fastMoveDraggedPoints: (renderIndices: number[], screenDx: number, screenDy: number) => { dataDx: number; dataDy: number };
+		fastMoveDraggedPoints: (
+			renderIndices: number[],
+			screenDx: number,
+			screenDy: number
+		) => { dataDx: number; dataDy: number };
 		setOrbitEnabled: (enabled: boolean) => void;
 		setHoverEnabled: (enabled: boolean) => void;
-		getPointsInScreenRect: (rect: { left: number; top: number; width: number; height: number }) => number[];
+		getPointsInScreenRect: (rect: {
+			left: number;
+			top: number;
+			width: number;
+			height: number;
+		}) => number[];
 	};
 
 	let {
@@ -37,9 +55,7 @@
 
 	// Cached data-to-world transform from the positions derived.
 	// Used by fastMoveDraggedPoints to convert screen pixels → world units.
-	let _worldScale   = 1;
-	let _worldCenterX = 0;
-	let _worldCenterY = 0;
+	let _worldScale = 1;
 
 	// Disabled while dragging points so OrbitControls doesn't pan the camera simultaneously
 	let orbitEnabled = $state(true);
@@ -55,10 +71,10 @@
 		if (!cameraRef) return;
 		const aspect = $size.width / $size.height;
 		const halfH = HALF_WORLD / Math.min(1, aspect);
-		cameraRef.top    =  halfH;
+		cameraRef.top = halfH;
 		cameraRef.bottom = -halfH;
-		cameraRef.left   = -halfH * aspect;
-		cameraRef.right  =  halfH * aspect;
+		cameraRef.left = -halfH * aspect;
+		cameraRef.right = halfH * aspect;
 		cameraRef.updateProjectionMatrix();
 	});
 
@@ -89,8 +105,10 @@
 
 		const arr = new Float32Array(points.length * 3);
 
-		let minX = Infinity, maxX = -Infinity;
-		let minY = Infinity, maxY = -Infinity;
+		let minX = Infinity,
+			maxX = -Infinity;
+		let minY = Infinity,
+			maxY = -Infinity;
 		for (let i = 0; i < points.length; i++) {
 			const p = points[i];
 			if (p.x < minX) minX = p.x;
@@ -107,12 +125,10 @@
 		const scale = targetRange / Math.max(rangeX, rangeY);
 
 		// Cache for fast-path drag updates
-		_worldScale   = scale;
-		_worldCenterX = centerX;
-		_worldCenterY = centerY;
+		_worldScale = scale;
 
 		for (let i = 0; i < points.length; i++) {
-			arr[i * 3]     = (points[i].x - centerX) * scale;
+			arr[i * 3] = (points[i].x - centerX) * scale;
 			arr[i * 3 + 1] = (points[i].y - centerY) * scale;
 			arr[i * 3 + 2] = 0;
 		}
@@ -123,9 +139,11 @@
 	// 2. Index map — fast lookup from data-idx → render-idx
 	// ==========================================
 	let pointIndexMap = $derived.by(() => {
-		const map = new Map<number, number>();
-		appState.pointsToRender.forEach((p, i) => map.set(p.idx, i));
-		return map;
+		const indexMap: Record<number, number> = {};
+		appState.pointsToRender.forEach((p, i) => {
+			indexMap[p.idx] = i;
+		});
+		return indexMap;
 	});
 
 	// ==========================================
@@ -134,12 +152,12 @@
 	const _tcache = new THREE.Color();
 	let rgbCache = $derived.by(() => {
 		const catInfo = appState.categoriesInfo['Label'] || {};
-		const map = new Map<string, { r: number; g: number; b: number }>();
+		const cache: Record<string, { r: number; g: number; b: number }> = {};
 		for (const [label, info] of Object.entries(catInfo)) {
-			_tcache.set((info as any).color ?? '#cccccc');
-			map.set(label, { r: _tcache.r, g: _tcache.g, b: _tcache.b });
+			_tcache.set(info.color || '#cccccc');
+			cache[label] = { r: _tcache.r, g: _tcache.g, b: _tcache.b };
 		}
-		return map;
+		return cache;
 	});
 	const _defaultRgb = { r: 0.8, g: 0.8, b: 0.8 };
 
@@ -151,36 +169,36 @@
 		const sz = points?.length || 0;
 		if (!sz) return new Float32Array(0);
 
-		const selectedIdx  = appState.selectedPointIdx;
-		const draggedList  = appState.draggedPointsIdx;
-		const hasUnstable  = appState.ifHighlightUnstablePoints;
+		const selectedIdx = appState.selectedPointIdx;
+		const draggedList = appState.draggedPointsIdx;
+		const hasUnstable = appState.ifHighlightUnstablePoints;
 		const unstableList = appState.unstablePointsIdx;
 
-		const arr         = new Float32Array(sz * 3);
-		const draggedSet  = new Set(draggedList);
-		const unstableSet = new Set(unstableList);
-		const defaultRgb  = _defaultRgb;
+		const arr = new Float32Array(sz * 3);
+		const draggedLookup = Object.fromEntries(draggedList.map((idx) => [idx, true] as const));
+		const unstableLookup = Object.fromEntries(unstableList.map((idx) => [idx, true] as const));
+		const defaultRgb = _defaultRgb;
 
 		// Fading is active only when something is hovered OR selected
-		const hasAnySelection = selectedIdx !== null || draggedSet.size > 0;
+		const hasAnySelection = selectedIdx !== null || draggedList.length > 0;
 		const needsFade = hasUnstable || hasAnySelection;
 
 		// Which cluster is hovered?
 		const hoveredCluster =
-			selectedIdx !== null
-				? String(appState.labelsOfSelectedCat[selectedIdx] ?? '')
-				: null;
+			selectedIdx !== null ? String(appState.labelsOfSelectedCat[selectedIdx] ?? '') : null;
 
 		for (let i = 0; i < sz; i++) {
-			const p     = points[i];
+			const p = points[i];
 			const label = String(p.cluster);
-			const c     = rgbCache.get(label) ?? defaultRgb;
+			const c = rgbCache[label] ?? defaultRgb;
 
-			let r = c.r, g = c.g, b = c.b;
+			let r = c.r,
+				g = c.g,
+				b = c.b;
 
 			if (needsFade) {
-				const isInUnstable       = hasUnstable && unstableSet.has(p.idx);
-				const isInDragged        = draggedSet.has(p.idx);
+				const isInUnstable = hasUnstable && Boolean(unstableLookup[p.idx]);
+				const isInDragged = Boolean(draggedLookup[p.idx]);
 				const isInHoveredCluster = hoveredCluster !== null && label === hoveredCluster;
 				if (!isInUnstable && !isInDragged && !isInHoveredCluster) {
 					// lerp 30% toward white
@@ -190,7 +208,7 @@
 				}
 			}
 
-			arr[i * 3]     = r;
+			arr[i * 3] = r;
 			arr[i * 3 + 1] = g;
 			arr[i * 3 + 2] = b;
 		}
@@ -226,7 +244,7 @@
 	// ==========================================
 	$effect(() => {
 		const clrs = colors;
-		const geo  = geometryRef;
+		const geo = geometryRef;
 
 		if (!geo || clrs.length === 0) return;
 
@@ -248,7 +266,8 @@
 		if (typeof window === 'undefined') return null;
 		const sz = 32;
 		const canvas = document.createElement('canvas');
-		canvas.width = sz; canvas.height = sz;
+		canvas.width = sz;
+		canvas.height = sz;
 		const ctx = canvas.getContext('2d');
 		if (!ctx) return null;
 		ctx.beginPath();
@@ -264,55 +283,25 @@
 	// ==========================================
 	let proxyData2D = $derived.by(() => {
 		if (appState.selectedPointIdx === null) return null;
-		const renderIdx = pointIndexMap.get(appState.selectedPointIdx);
+		const renderIdx = pointIndexMap[appState.selectedPointIdx];
 		if (renderIdx === undefined) return null;
 
 		const x = positions[renderIdx * 3];
 		const y = positions[renderIdx * 3 + 1];
 
 		const label = String(appState.labelsOfSelectedCat[appState.selectedPointIdx] ?? '');
-		const c = rgbCache.get(label) ?? _defaultRgb;
+		const c = rgbCache[label] ?? _defaultRgb;
 
 		return {
 			position: new Float32Array([x, y, 0.5]),
 			// White ring behind + cluster color fill — two stacked proxy meshes
-			fillColor:   new Float32Array([c.r, c.g, c.b]),
-			ringColor:   new Float32Array([0.2, 0.2, 0.2])
+			fillColor: new Float32Array([c.r, c.g, c.b]),
+			ringColor: new Float32Array([0.2, 0.2, 0.2])
 		};
 	});
 
 	// ==========================================
-	// 7. KNN graph edges — src → each targetPointsIdx
-	// ==========================================
-	let edgePositions = $derived.by(() => {
-		if (appState.selectedPointIdx === null || appState.targetPointsIdx.length === 0) return null;
-
-		const srcRenderIdx = pointIndexMap.get(appState.selectedPointIdx);
-		if (srcRenderIdx === undefined) return null;
-
-		const srcX = positions[srcRenderIdx * 3];
-		const srcY = positions[srcRenderIdx * 3 + 1];
-
-		const targets = appState.targetPointsIdx;
-		// Pre-allocate: each edge = 2 vertices × 3 floats
-		const buf = new Float32Array(targets.length * 6);
-		let count = 0;
-		for (const tgtIdx of targets) {
-			const tRenderIdx = pointIndexMap.get(tgtIdx);
-			if (tRenderIdx === undefined) continue;
-			const base = count * 6;
-			buf[base]     = srcX; buf[base + 1] = srcY; buf[base + 2] = 0.5;
-			buf[base + 3] = positions[tRenderIdx * 3];
-			buf[base + 4] = positions[tRenderIdx * 3 + 1];
-			buf[base + 5] = 0.5;
-			count++;
-		}
-
-		return count > 0 ? buf.subarray(0, count * 6) as Float32Array : null;
-	});
-
-	// ==========================================
-	// 8. Fast-path drag: directly patch GPU buffer, bypass reactive chain
+	// 7. Fast-path drag: directly patch GPU buffer, bypass reactive chain
 	// ==========================================
 	function fastMoveDraggedPoints(
 		renderIndices: number[],
@@ -327,17 +316,17 @@
 		// Pixel → world: derived from the orthographic camera frustum + OrbitControls zoom.
 		// The camera frustum height (at zoom=1) is 2*halfH world units over $size.height pixels.
 		// OrbitControls zoom further divides the visible range, so effective world-per-pixel = 2*halfH / (height*zoom).
-		const zoom    = cameraRef?.zoom ?? 1;
-		const aspect  = $size.width / $size.height;
-		const halfH   = HALF_WORLD / Math.min(1, aspect);
+		const zoom = cameraRef?.zoom ?? 1;
+		const aspect = $size.width / $size.height;
+		const halfH = HALF_WORLD / Math.min(1, aspect);
 		const worldPerPx = (2 * halfH) / ($size.height * zoom);
 
-		const worldDx =  screenDx * worldPerPx;
+		const worldDx = screenDx * worldPerPx;
 		const worldDy = -screenDy * worldPerPx; // Y-axis flip
 
 		const arr = posAttr.array as Float32Array;
 		for (const ri of renderIndices) {
-			arr[ri * 3]     += worldDx;
+			arr[ri * 3] += worldDx;
 			arr[ri * 3 + 1] += worldDy;
 		}
 		posAttr.needsUpdate = true;
@@ -406,9 +395,14 @@
 	}
 
 	// ==========================================
-	// 9. Screen-rect → data-index lookup (for box selection)
+	// 8. Screen-rect → data-index lookup (for box selection)
 	// ==========================================
-	function getPointsInScreenRect(rect: { left: number; top: number; width: number; height: number }): number[] {
+	function getPointsInScreenRect(rect: {
+		left: number;
+		top: number;
+		width: number;
+		height: number;
+	}): number[] {
 		if (!cameraRef || !geometryRef) return [];
 		const cam = cameraRef;
 		const W = $size.width;
@@ -417,14 +411,16 @@
 		// Orthographic screen → world conversion (accounts for pan + zoom)
 		function screenToWorld(sx: number, sy: number): { wx: number; wy: number } {
 			const wx = (cam.left + (sx / W) * (cam.right - cam.left)) / cam.zoom + cam.position.x;
-			const wy = (cam.top  - (sy / H) * (cam.top - cam.bottom)) / cam.zoom + cam.position.y;
+			const wy = (cam.top - (sy / H) * (cam.top - cam.bottom)) / cam.zoom + cam.position.y;
 			return { wx, wy };
 		}
 
 		const { wx: wx1, wy: wy1 } = screenToWorld(rect.left, rect.top);
 		const { wx: wx2, wy: wy2 } = screenToWorld(rect.left + rect.width, rect.top + rect.height);
-		const minX = Math.min(wx1, wx2), maxX = Math.max(wx1, wx2);
-		const minY = Math.min(wy1, wy2), maxY = Math.max(wy1, wy2);
+		const minX = Math.min(wx1, wx2),
+			maxX = Math.max(wx1, wx2);
+		const minY = Math.min(wy1, wy2),
+			maxY = Math.max(wy1, wy2);
 
 		const posAttr = geometryRef.getAttribute('position') as THREE.BufferAttribute | null;
 		if (!posAttr) return [];
@@ -454,7 +450,7 @@
 	let _pendingHoverIdx: number | null = null;
 	let _hoverRafHandle: number | null = null;
 
-	function handlePointerMove(e: any) {
+	function handlePointerMove(e: IndexedPointerEvent) {
 		if (!hoverEnabled || e.index === undefined) return;
 		// Cache the reactive reference locally to avoid repeated proxy tracking per event
 		const pts = appState.pointsToRender;
@@ -484,7 +480,7 @@
 		if (_hoverRafHandle !== null) cancelAnimationFrame(_hoverRafHandle);
 	});
 
-	function handleClick(e: any) {
+	function handleClick(e: IndexedPointerEvent) {
 		if (e.index !== undefined) {
 			appState.toggleClusterSelection(appState.pointsToRender[e.index].idx);
 		}
@@ -492,6 +488,13 @@
 
 	function handleMissed() {
 		appState.draggedPointsIdx = [];
+	}
+
+	function attachAttribute(name: 'position' | 'color') {
+		return ({ parent, ref }: AttributeAttachContext) => {
+			(parent as THREE.BufferGeometry).setAttribute(name, ref);
+			return () => {};
+		};
 	}
 </script>
 
@@ -509,7 +512,9 @@
 		enableRotate={false}
 		enableZoom={true}
 		mouseButtons={{ LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN }}
-		on:change={() => { if (cameraRef) cameraZoom = cameraRef.zoom; }}
+		on:change={() => {
+			if (cameraRef) cameraZoom = cameraRef.zoom;
+		}}
 	/>
 </T.OrthographicCamera>
 
@@ -543,20 +548,8 @@
 {#if proxyData2D !== null}
 	<T.Points renderOrder={998}>
 		<T.BufferGeometry>
-			<T.BufferAttribute
-				args={[proxyData2D.position, 3]}
-				attach={({ parent, ref }) => {
-					(parent as any).setAttribute('position', ref);
-					return () => {};
-				}}
-			/>
-			<T.BufferAttribute
-				args={[proxyData2D.ringColor, 3]}
-				attach={({ parent, ref }) => {
-					(parent as any).setAttribute('color', ref);
-					return () => {};
-				}}
-			/>
+			<T.BufferAttribute args={[proxyData2D.position, 3]} attach={attachAttribute('position')} />
+			<T.BufferAttribute args={[proxyData2D.ringColor, 3]} attach={attachAttribute('color')} />
 		</T.BufferGeometry>
 		<T.PointsMaterial
 			size={28}
@@ -574,20 +567,8 @@
 	     Clicks pass through to the main T.Points below to avoid double-toggling. -->
 	<T.Points renderOrder={999}>
 		<T.BufferGeometry>
-			<T.BufferAttribute
-				args={[proxyData2D.position, 3]}
-				attach={({ parent, ref }) => {
-					(parent as any).setAttribute('position', ref);
-					return () => {};
-				}}
-			/>
-			<T.BufferAttribute
-				args={[proxyData2D.fillColor, 3]}
-				attach={({ parent, ref }) => {
-					(parent as any).setAttribute('color', ref);
-					return () => {};
-				}}
-			/>
+			<T.BufferAttribute args={[proxyData2D.position, 3]} attach={attachAttribute('position')} />
+			<T.BufferAttribute args={[proxyData2D.fillColor, 3]} attach={attachAttribute('color')} />
 		</T.BufferGeometry>
 		<T.PointsMaterial
 			size={25}
@@ -600,20 +581,4 @@
 			depthTest={false}
 		/>
 	</T.Points>
-{/if}
-
-<!-- KNN graph edges -->
-{#if edgePositions !== null}
-	<T.LineSegments renderOrder={997}>
-		<T.BufferGeometry>
-			<T.BufferAttribute
-				args={[edgePositions, 3]}
-				attach={({ parent, ref }) => {
-					(parent as any).setAttribute('position', ref);
-					return () => {};
-				}}
-			/>
-		</T.BufferGeometry>
-		<T.LineBasicMaterial color="#555555" transparent={true} opacity={0.45} depthTest={false} />
-	</T.LineSegments>
 {/if}

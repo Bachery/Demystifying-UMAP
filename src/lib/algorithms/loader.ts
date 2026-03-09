@@ -9,9 +9,7 @@ export type DatasetResult = {
 const SPECTRAL_NN = [5, 15, 30, 50, 100, 200, 300, 500];
 
 function closestNN(n: number): number {
-	return SPECTRAL_NN.reduce((best, v) =>
-		Math.abs(v - n) < Math.abs(best - n) ? v : best
-	);
+	return SPECTRAL_NN.reduce((best, v) => (Math.abs(v - n) < Math.abs(best - n) ? v : best));
 }
 
 export class DatasetLoader {

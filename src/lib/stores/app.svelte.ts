@@ -1,41 +1,43 @@
 // src/lib/stores/app.svelte.ts
 import { type DatasetResult, DatasetLoader } from '$lib/algorithms/loader';
-import type { UMAPParams } from '$lib/algorithms/umap.worker';
+import type { UMAPParams, WorkerResponseMessage } from '$lib/algorithms/umap.worker';
 import UmapWorker from '$lib/algorithms/umap.worker?worker';
 import { pcaInit } from '$lib/algorithms/pca';
 import { hsl } from 'd3-color';
 
 const loader = new DatasetLoader();
 
+type CategoryInfo = {
+	cluster_id: number;
+	size: number;
+	color: string;
+};
+
+type ProjectionHistoryEntry = {
+	data: number[][];
+	thumbnail: string;
+	params: UMAPParams;
+	steered?: boolean;
+};
+
 export class AppState {
 	// ==========================================
 	// 1. 基础数据与表格逻辑 (Data Table & Filtering)
 	// ==========================================
-	dataset = $state<DatasetResult | null>(null); // 补上了这个
+	dataset = $state<DatasetResult | null>(null);
 	dataMatrix = $state<number[][]>([]);
 	dataSize = $state(0);
 	usingRows = $state<number[]>([]);
 
-	// 列选择逻辑 (为未来用户上传数据预留)
-	numericalColumns = $state<string[]>([]);
-	categoricalColumns = $state<string[]>([]);
-	selectedNumColumns = $state<string[]>([]);
-	selectedCatColumn = $state<string>('');
-	categoriesInfo = $state<Record<string, any>>({});
+	categoriesInfo = $state<Record<string, Record<string, CategoryInfo>>>({});
 	continuousRange = $state<{ min: number; max: number } | null>(null);
-	labelsOfSelectedCat = $state<string[]>([]); 
-
-	// Derived: 获取选中的数值列的 Index
-	selectedNumColumnsIdx = $derived.by(() => {
-		if (!this.numericalColumns.length || !this.selectedNumColumns.length) return [];
-		return this.selectedNumColumns.map(col => this.numericalColumns.indexOf(col));
-	});
+	labelsOfSelectedCat = $state<string[]>([]);
 
 	// ==========================================
 	// 2. UMAP 参数与状态 (UMAP Parameters & Status)
 	// ==========================================
 	params = $state<UMAPParams>({
-		nNeighbors: 15, // 注意这里字段名要跟 Worker 里定义的一致
+		nNeighbors: 15,
 		minDist: 0.1,
 		spread: 1.0,
 		nEpochs: 500,
@@ -51,14 +53,15 @@ export class AppState {
 	currentEpoch = $state(0);
 	totalEpochs = $state(500);
 	private worker: Worker | null = null;
+	private runSequence = 0;
+	private activeRunId = 0;
 
 	// ==========================================
 	// 3. 投影历史与动画 (History & Morphing)
 	// ==========================================
-	history = $state<Array<{ data: number[][], thumbnail: string, params: any, steered?: boolean }>>([]);
+	history = $state<ProjectionHistoryEntry[]>([]);
 	currentProjectionIdx = $state(-1);
 	previousProjectionIdx = $state(-1);
-	changePreviousIdx = $state(true);
 	animationProgress = $state(1.0);
 	realtimeEmbedding = $state<number[][] | null>(null);
 
@@ -84,7 +87,9 @@ export class AppState {
 		const hasPrev = t < 1.0 && prev !== null && prev.length > 0;
 		const labels = this.labelsOfSelectedCat;
 
-		const result: { idx: number; x: number; y: number; cluster: string }[] = new Array(this.usingRows.length);
+		const result: { idx: number; x: number; y: number; cluster: string }[] = new Array(
+			this.usingRows.length
+		);
 		for (let i = 0; i < this.usingRows.length; i++) {
 			const actualIdx = this.usingRows[i];
 			const point = curr[actualIdx];
@@ -109,17 +114,16 @@ export class AppState {
 	// 4. 交互与高亮 (Interaction)
 	// ==========================================
 	selectedPointIdx = $state<number | null>(null);
-	graphEdges = $state<Record<string, number[]>>({}); 
-	
-	targetPointsIdx = $derived.by(() => {
-		if (this.selectedPointIdx === null) return [];
-		return this.graphEdges[String(this.selectedPointIdx)] || [];
-	});
 
 	ifHighlightUnstablePoints = $state(false);
-	
+
 	unstablePointsIdx = $derived.by(() => {
-		if (!this.ifHighlightUnstablePoints || !this.currentProjectionData.length || !this.previousProjectionData.length) return [];
+		if (
+			!this.ifHighlightUnstablePoints ||
+			!this.currentProjectionData.length ||
+			!this.previousProjectionData.length
+		)
+			return [];
 		const unstablePoints: number[] = [];
 		const threshold2 = 1.0; // squared Euclidean distance threshold (threshold=1.0 → threshold²=1.0)
 		const currData = this.currentProjectionData;
@@ -156,16 +160,18 @@ export class AppState {
 			(idx) => String(this.labelsOfSelectedCat[idx] ?? '') === label
 		);
 
-		const draggedSet = new Set(this.draggedPointsIdx);
-		const clickedIsSelected = draggedSet.has(pointIdx);
+		const draggedLookup = Object.fromEntries(
+			this.draggedPointsIdx.map((idx) => [idx, true] as const)
+		);
+		const clickedIsSelected = Boolean(draggedLookup[pointIdx]);
 
 		if (clickedIsSelected) {
 			// Remove cluster members from the selection
-			const clusterSet = new Set(clusterPoints);
-			this.draggedPointsIdx = this.draggedPointsIdx.filter((idx) => !clusterSet.has(idx));
+			const clusterLookup = Object.fromEntries(clusterPoints.map((idx) => [idx, true] as const));
+			this.draggedPointsIdx = this.draggedPointsIdx.filter((idx) => !clusterLookup[idx]);
 		} else {
 			// Add cluster members not already in the selection (reuse draggedSet built above)
-			const toAdd = clusterPoints.filter((idx) => !draggedSet.has(idx));
+			const toAdd = clusterPoints.filter((idx) => !draggedLookup[idx]);
 			this.draggedPointsIdx = [...this.draggedPointsIdx, ...toAdd];
 		}
 	}
@@ -181,43 +187,55 @@ export class AppState {
 		if (typeof window === 'undefined') return;
 
 		this.worker = new UmapWorker();
-		this.worker.onmessage = (e) => {
-			const { type, embedding, epoch } = e.data;
-			
+		this.worker.onmessage = (e: MessageEvent<WorkerResponseMessage>) => {
+			const { type, runId } = e.data;
+			if (runId !== this.activeRunId) return;
+
 			if (type === 'KNN_DONE') {
 				this.isKnnDone = true;
 			} else if (type === 'UPDATE') {
-				// 计算中：实时更新最新的 embedding，但不存入 history
-				this.updateCurrentProjectionRealtime(embedding);
-				this.currentEpoch = epoch;
+				this.currentEpoch = e.data.epoch;
 				this.isCalculating = true;
 			} else if (type === 'FINISHED') {
-				// 计算完成：正式存入 History
-				this.finishCalculation(embedding);
+				this.finishCalculation(e.data.embedding);
 				this.isCalculating = false;
 				this.currentEpoch = this.totalEpochs;
+				this.activeRunId = 0;
 			}
 		};
+	}
+
+	private clearRunningState() {
+		this.isCalculating = false;
+		this.isKnnDone = false;
+		this.currentEpoch = 0;
+		this.realtimeEmbedding = null;
+	}
+
+	private cancelActiveRun() {
+		if (this.activeRunId !== 0) {
+			this.worker?.postMessage({ type: 'STOP', runId: this.activeRunId });
+			this.activeRunId = 0;
+		}
+		this.clearRunningState();
 	}
 
 	// ==========================================
 	// 6. 全局方法 (Actions)
 	// ==========================================
 
-	setDataset(result: any) {
-		this.dataset = result; // 记录原始 DatasetResult
+	setDataset(result: DatasetResult) {
+		this.dataset = result;
 		this.dataMatrix = result.data;
 		this.dataSize = result.data.length;
 		this.usingRows = Array.from({ length: this.dataSize }, (_, i) => i);
-		this.categoricalColumns = ['Label'];
-		this.selectedCatColumn = 'Label';
 		this.labelsOfSelectedCat = result.labels.map(String);
 		this.setupCategories(result.labels, result.type);
-		
+		this.selectedPointIdx = null;
+		this.draggedPointsIdx = [];
+
 		// 停止正在运行的计算，防止旧结果污染新数据集的历史
-		this.worker?.postMessage({ type: 'STOP' });
-		this.isCalculating = false;
-		this.realtimeEmbedding = null;
+		this.cancelActiveRun();
 
 		// 重置历史
 		this.history = [];
@@ -237,12 +255,10 @@ export class AppState {
 	async runUMAP() {
 		if (!this.dataMatrix.length || !this.worker) return;
 
-		// 停止之前的
-		this.worker.postMessage({ type: 'STOP' });
+		this.cancelActiveRun();
 
+		this.activeRunId = ++this.runSequence;
 		this.isCalculating = true;
-		this.isKnnDone = false;
-		this.currentEpoch = 0;
 		this.totalEpochs = this.params.nEpochs;
 
 		// 确定初始化位置
@@ -250,37 +266,42 @@ export class AppState {
 
 		// 按用户选择的初始化方式
 		switch (this.initMethod) {
-				case 'spectral': {
-					const nn = this.params.nNeighbors;
-					const spectral = await loader.loadSpectralInit(this.dataset!.name, nn);
-					if (spectral) {
-						initPositions = spectral;
-						console.log(`[UMAP] Spectral init (nn=${nn}→closest file): ${spectral.length} points ("${this.dataset!.name}")`);
-					} else {
-						// 文件不存在时回退到 PCA
-						const { embedding, timeMs } = pcaInit($state.snapshot(this.dataMatrix));
-						initPositions = embedding;
-						console.log(`[UMAP] Spectral init not found, PCA fallback: ${timeMs.toFixed(1)}ms ("${this.dataset!.name}")`);
-					}
-					break;
-				}
-				case 'pca': {
+			case 'spectral': {
+				const nn = this.params.nNeighbors;
+				const spectral = await loader.loadSpectralInit(this.dataset!.name, nn);
+				if (spectral) {
+					initPositions = spectral;
+					console.log(
+						`[UMAP] Spectral init (nn=${nn}→closest file): ${spectral.length} points ("${this.dataset!.name}")`
+					);
+				} else {
 					const { embedding, timeMs } = pcaInit($state.snapshot(this.dataMatrix));
 					initPositions = embedding;
-					console.log(`[UMAP] PCA init: ${timeMs.toFixed(1)}ms, ${embedding.length} points ("${this.dataset!.name}")`);
-					break;
+					console.log(
+						`[UMAP] Spectral init not found, PCA fallback: ${timeMs.toFixed(1)}ms ("${this.dataset!.name}")`
+					);
 				}
-				case 'random':
-					console.log(`[UMAP] Random init ("${this.dataset!.name}")`);
-					break;
-				case 'current': {
-					if (this.currentProjectionIdx !== -1) {
-						initPositions = $state.snapshot(this.currentProjectionData) as number[][];
-						console.log(`[UMAP] Current embedding init ("${this.dataset!.name}")`);
-					}
-					break;
-				}
+				break;
 			}
+			case 'pca': {
+				const { embedding, timeMs } = pcaInit($state.snapshot(this.dataMatrix));
+				initPositions = embedding;
+				console.log(
+					`[UMAP] PCA init: ${timeMs.toFixed(1)}ms, ${embedding.length} points ("${this.dataset!.name}")`
+				);
+				break;
+			}
+			case 'random':
+				console.log(`[UMAP] Random init ("${this.dataset!.name}")`);
+				break;
+			case 'current': {
+				if (this.currentProjectionIdx !== -1) {
+					initPositions = $state.snapshot(this.currentProjectionData) as number[][];
+					console.log(`[UMAP] Current embedding init ("${this.dataset!.name}")`);
+				}
+				break;
+			}
+		}
 
 		// 初始化位置确定后，立即渲染到 2D 画布
 		if (initPositions) {
@@ -290,6 +311,7 @@ export class AppState {
 		// 发送给 Worker
 		this.worker.postMessage({
 			type: 'INIT',
+			runId: this.activeRunId,
 			data: $state.snapshot(this.dataMatrix),
 			params: $state.snapshot(this.params),
 			initPositions
@@ -300,42 +322,44 @@ export class AppState {
 	 * 停止计算
 	 */
 	stop() {
-		this.worker?.postMessage({ type: 'STOP' });
-		this.isCalculating = false;
-	}
-
-	private updateCurrentProjectionRealtime(embedding: number[][]) {
-		if (!embedding) return;
-		this.realtimeEmbedding = embedding;
+		this.cancelActiveRun();
 	}
 
 	generateThumbnail(embedding: number[][]): string {
 		if (typeof window === 'undefined' || !embedding.length) return '';
-		const SIZE = 48, PAD = 3;
+		const SIZE = 48,
+			PAD = 3;
 		const canvas = document.createElement('canvas');
-		canvas.width = SIZE; canvas.height = SIZE;
+		canvas.width = SIZE;
+		canvas.height = SIZE;
 		const ctx = canvas.getContext('2d');
 		if (!ctx) return '';
 
-		let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+		let minX = Infinity,
+			maxX = -Infinity,
+			minY = Infinity,
+			maxY = -Infinity;
 		for (let i = 0; i < embedding.length; i++) {
-			const x = embedding[i][0], y = embedding[i][1];
-			if (x < minX) minX = x; if (x > maxX) maxX = x;
-			if (y < minY) minY = y; if (y > maxY) maxY = y;
+			const x = embedding[i][0],
+				y = embedding[i][1];
+			if (x < minX) minX = x;
+			if (x > maxX) maxX = x;
+			if (y < minY) minY = y;
+			if (y > maxY) maxY = y;
 		}
 		const draw = SIZE - PAD * 2;
 		const scale = draw / (Math.max(maxX - minX, maxY - minY) || 1);
 		const catInfo = this.categoriesInfo['Label'] || {};
 
 		// Pre-parse hex colors to integer RGB once per category (not per point)
-		const rgbInt = new Map<string, [number, number, number]>();
+		const rgbInt: Record<string, [number, number, number]> = {};
 		for (const [label, info] of Object.entries(catInfo)) {
-			const hex = ((info as any).color ?? '#cccccc').replace('#', '');
-			rgbInt.set(label, [
+			const hex = (info.color || '#cccccc').replace('#', '');
+			rgbInt[label] = [
 				parseInt(hex.slice(0, 2), 16),
 				parseInt(hex.slice(2, 4), 16),
 				parseInt(hex.slice(4, 6), 16)
-			]);
+			];
 		}
 		const defaultRgb: [number, number, number] = [204, 204, 204];
 		const labels = this.labelsOfSelectedCat;
@@ -351,9 +375,9 @@ export class AppState {
 			const py = Math.round(PAD + (maxY - embedding[i][1]) * scale); // Y flip
 			if (px < 0 || px >= SIZE || py < 0 || py >= SIZE) continue;
 			const label = String(labels[i] ?? '');
-			const rgb = rgbInt.get(label) ?? defaultRgb;
+			const rgb = rgbInt[label] ?? defaultRgb;
 			const base = (py * SIZE + px) * 4;
-			data[base]     = rgb[0];
+			data[base] = rgb[0];
 			data[base + 1] = rgb[1];
 			data[base + 2] = rgb[2];
 			// data[base + 3] = 255; // already set by fill(255)
@@ -411,23 +435,26 @@ export class AppState {
 		// MorphControl 滑条可让用户手动回看 Previous
 		this.animationProgress = 1.0;
 
-		console.log(`History updated. Curr: ${this.currentProjectionIdx}, Prev: ${this.previousProjectionIdx}`);
+		console.log(
+			`History updated. Curr: ${this.currentProjectionIdx}, Prev: ${this.previousProjectionIdx}`
+		);
 	}
 
-	private setupCategories(labels: any[], type: string) {
-		const info: Record<string, any> = {};
+	private setupCategories(labels: Array<string | number>, type: DatasetResult['type']) {
+		const info: Record<string, CategoryInfo> = {};
 
 		// Count occurrences in O(n)
-		const countMap = new Map<string, number>();
+		const counts: Record<string, number> = {};
 		for (const label of labels) {
 			const key = String(label);
-			countMap.set(key, (countMap.get(key) || 0) + 1);
+			counts[key] = (counts[key] || 0) + 1;
 		}
 
 		if (type === 'continuous') {
 			// Use loop instead of spread to avoid potential stack overflow on large datasets
-			let minVal = Infinity, maxVal = -Infinity;
-			for (const key of countMap.keys()) {
+			let minVal = Infinity,
+				maxVal = -Infinity;
+			for (const key of Object.keys(counts)) {
 				const v = Number(key);
 				if (v < minVal) minVal = v;
 				if (v > maxVal) maxVal = v;
@@ -435,7 +462,7 @@ export class AppState {
 			const range = maxVal - minVal || 1;
 			this.continuousRange = { min: minVal, max: maxVal };
 
-			for (const [labelStr, count] of countMap) {
+			for (const [labelStr, count] of Object.entries(counts)) {
 				const t = (Number(labelStr) - minVal) / range; // 0 → 1
 				// Blue (t=0, hue=240°) → Red (t=1, hue=0°)
 				const color = hsl((1 - t) * 240, 0.85, 0.5);
@@ -443,15 +470,26 @@ export class AppState {
 			}
 		} else {
 			this.continuousRange = null;
-			const colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'];
+			const colors = [
+				'#1f77b4',
+				'#ff7f0e',
+				'#2ca02c',
+				'#d62728',
+				'#9467bd',
+				'#8c564b',
+				'#e377c2',
+				'#7f7f7f',
+				'#bcbd22',
+				'#17becf'
+			];
 			let index = 0;
-			for (const [labelStr, count] of countMap) {
+			for (const [labelStr, count] of Object.entries(counts)) {
 				info[labelStr] = { cluster_id: index, size: count, color: colors[index % colors.length] };
 				index++;
 			}
 		}
 
-		this.categoriesInfo = { 'Label': info };
+		this.categoriesInfo = { Label: info };
 	}
 }
 
