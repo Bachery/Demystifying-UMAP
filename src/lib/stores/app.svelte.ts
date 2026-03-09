@@ -327,7 +327,7 @@ export class AppState {
 
 	generateThumbnail(embedding: number[][]): string {
 		if (typeof window === 'undefined' || !embedding.length) return '';
-		const SIZE = 48,
+		const SIZE = 96,
 			PAD = 3;
 		const canvas = document.createElement('canvas');
 		canvas.width = SIZE;
