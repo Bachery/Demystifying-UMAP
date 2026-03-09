@@ -27,44 +27,60 @@
 	});
 
 	// ==========================================
+	// 1.5 RGB cache — rebuilt only when category info changes
+	// ==========================================
+	const _tc3 = new THREE.Color();
+	let rgbCache3D = $derived.by(() => {
+		const catInfo = appState.categoriesInfo['Label'] || {};
+		const map = new Map<string, { r: number; g: number; b: number }>();
+		for (const [label, info] of Object.entries(catInfo)) {
+			_tc3.set((info as any).color ?? '#cccccc');
+			map.set(label, { r: _tc3.r, g: _tc3.g, b: _tc3.b });
+		}
+		return map;
+	});
+	const _defaultRgb3D = { r: 0.8, g: 0.8, b: 0.8 };
+
+	// ==========================================
 	// 2. Colors — unified fading logic
 	// ==========================================
 	let colors = $derived.by(() => {
 		if (!appState.dataMatrix.length) return new Float32Array(0);
 
 		const colorArray = new Float32Array(appState.dataSize * 3);
-		const tempColor = new THREE.Color();
-		const whiteColor = new THREE.Color('#ffffff');
-
 		const selectedIdx = appState.selectedPointIdx;
 		const draggedSet = new Set(appState.draggedPointsIdx);
-		const catInfo = appState.categoriesInfo['Label'] || {};
 		const unstableSet = new Set(appState.unstablePointsIdx);
 		const hasUnstable = appState.ifHighlightUnstablePoints;
+		const labels = appState.labelsOfSelectedCat;
 
 		// Fading is active only when something is hovered OR something is selected
 		const hasAnySelection = selectedIdx !== null || draggedSet.size > 0;
+		const needsFade = hasUnstable || hasAnySelection;
 
 		// Which cluster is currently being hovered?
 		const hoveredCluster =
-			selectedIdx !== null ? String(appState.labelsOfSelectedCat[selectedIdx] ?? '') : null;
+			selectedIdx !== null ? String(labels[selectedIdx] ?? '') : null;
 
 		for (let i = 0; i < appState.dataSize; i++) {
-			const label = String(appState.labelsOfSelectedCat[i] ?? '');
+			const label = String(labels[i] ?? '');
+			const c = rgbCache3D.get(label) ?? _defaultRgb3D;
+			let r = c.r, g = c.g, b = c.b;
 
-			const colorStr = catInfo[label]?.color ?? '#cccccc';
-			tempColor.set(colorStr);
-
-			const isInUnstable       = hasUnstable && unstableSet.has(i);
-			const isInDragged        = draggedSet.has(i);
-			const isInHoveredCluster = hoveredCluster !== null && label === hoveredCluster;
-			if ((hasUnstable || hasAnySelection) && !isInUnstable && !isInDragged && !isInHoveredCluster) {
-				tempColor.lerp(whiteColor, 0.3);
+			if (needsFade) {
+				const isInUnstable       = hasUnstable && unstableSet.has(i);
+				const isInDragged        = draggedSet.has(i);
+				const isInHoveredCluster = hoveredCluster !== null && label === hoveredCluster;
+				if (!isInUnstable && !isInDragged && !isInHoveredCluster) {
+					r = r + (1 - r) * 0.3;
+					g = g + (1 - g) * 0.3;
+					b = b + (1 - b) * 0.3;
+				}
 			}
 
-			colorArray[i * 3]     = tempColor.r;
-			colorArray[i * 3 + 1] = tempColor.g;
-			colorArray[i * 3 + 2] = tempColor.b;
+			colorArray[i * 3]     = r;
+			colorArray[i * 3 + 1] = g;
+			colorArray[i * 3 + 2] = b;
 		}
 		return colorArray;
 	});

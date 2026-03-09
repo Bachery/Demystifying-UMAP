@@ -3,28 +3,31 @@
 // Extracts top 2 principal components via power iteration + Gram-Schmidt,
 // avoiding explicit covariance matrix construction (O(n*d) per iteration).
 
-function dot(a: number[], b: number[]): number {
+function dot(a: Float64Array | number[], b: Float64Array | number[]): number {
 	let sum = 0;
 	for (let i = 0; i < a.length; i++) sum += a[i] * b[i];
 	return sum;
 }
 
-function normalize(v: number[]): number[] {
+function normalize(v: Float64Array): Float64Array {
 	let n = 0;
-	for (const x of v) n += x * x;
+	for (let i = 0; i < v.length; i++) n += v[i] * v[i];
 	n = Math.sqrt(n);
-	return n === 0 ? v.slice() : v.map((x) => x / n);
+	const out = new Float64Array(v.length);
+	if (n === 0) { out.set(v); return out; }
+	for (let i = 0; i < v.length; i++) out[i] = v[i] / n;
+	return out;
 }
 
 /**
  * Computes (X^T X) v via two matrix-vector products.
  * Equivalent to multiplying by the covariance matrix but O(n*d) instead of O(d^2).
  */
-function matvec(X: number[][], v: number[]): number[] {
+function matvec(X: number[][], v: Float64Array | number[]): number[] {
 	const n = X.length;
 	const d = v.length;
-	// u = X * v  (n-vector)
-	const u = new Array<number>(n);
+	// u = X * v  (n-vector) — typed array avoids boxing overhead
+	const u = new Float64Array(n);
 	for (let i = 0; i < n; i++) {
 		let s = 0;
 		const row = X[i];
@@ -32,30 +35,36 @@ function matvec(X: number[][], v: number[]): number[] {
 		u[i] = s;
 	}
 	// result = X^T * u  (d-vector)
-	const result = new Array<number>(d).fill(0);
+	const result = new Float64Array(d);
 	for (let i = 0; i < n; i++) {
 		const ui = u[i];
 		const row = X[i];
 		for (let j = 0; j < d; j++) result[j] += row[j] * ui;
 	}
-	return result;
+	return Array.from(result);
 }
 
 /**
  * Power iteration to find the dominant eigenvector of X^T X.
  * @param deflect  If provided, the result is deflated to be orthogonal to this vector (Gram-Schmidt).
  */
-function powerIterate(X: number[][], deflect: number[] | null, iters = 100): number[] {
+function powerIterate(X: number[][], deflect: Float64Array | null, iters = 100): Float64Array {
 	const d = X[0].length;
-	// Deterministic start: uniform vector
-	let v = normalize(new Array<number>(d).fill(1));
+	// Deterministic start: uniform vector (Float64Array for typed-array path throughout)
+	const init = new Float64Array(d).fill(1);
+	let v = normalize(init);
 
 	for (let iter = 0; iter < iters; iter++) {
-		v = normalize(matvec(X, v));
+		const mv = matvec(X, v);
+		// Convert matvec result (number[]) to Float64Array for normalize
+		const mvTyped = new Float64Array(mv);
+		v = normalize(mvTyped);
 		if (deflect) {
 			// Subtract projection onto deflect (Gram-Schmidt orthogonalization)
 			const proj = dot(v, deflect);
-			v = normalize(v.map((x, i) => x - proj * deflect[i]));
+			const deflected = new Float64Array(d);
+			for (let i = 0; i < d; i++) deflected[i] = v[i] - proj * deflect[i];
+			v = normalize(deflected);
 		}
 	}
 	return v;

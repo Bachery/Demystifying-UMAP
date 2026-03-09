@@ -129,6 +129,21 @@
 	});
 
 	// ==========================================
+	// 2.5 RGB cache — rebuilt only when category info changes (not on hover/select)
+	// ==========================================
+	const _tcache = new THREE.Color();
+	let rgbCache = $derived.by(() => {
+		const catInfo = appState.categoriesInfo['Label'] || {};
+		const map = new Map<string, { r: number; g: number; b: number }>();
+		for (const [label, info] of Object.entries(catInfo)) {
+			_tcache.set((info as any).color ?? '#cccccc');
+			map.set(label, { r: _tcache.r, g: _tcache.g, b: _tcache.b });
+		}
+		return map;
+	});
+	const _defaultRgb = { r: 0.8, g: 0.8, b: 0.8 };
+
+	// ==========================================
 	// 3. Colors — unified fading logic
 	// ==========================================
 	let colors = $derived.by(() => {
@@ -140,16 +155,15 @@
 		const draggedList  = appState.draggedPointsIdx;
 		const hasUnstable  = appState.ifHighlightUnstablePoints;
 		const unstableList = appState.unstablePointsIdx;
-		const catInfo      = appState.categoriesInfo['Label'] || {};
 
 		const arr         = new Float32Array(sz * 3);
-		const tempColor   = new THREE.Color();
-		const whiteColor  = new THREE.Color('#ffffff');
 		const draggedSet  = new Set(draggedList);
 		const unstableSet = new Set(unstableList);
+		const defaultRgb  = _defaultRgb;
 
 		// Fading is active only when something is hovered OR selected
 		const hasAnySelection = selectedIdx !== null || draggedSet.size > 0;
+		const needsFade = hasUnstable || hasAnySelection;
 
 		// Which cluster is hovered?
 		const hoveredCluster =
@@ -160,20 +174,25 @@
 		for (let i = 0; i < sz; i++) {
 			const p     = points[i];
 			const label = String(p.cluster);
+			const c     = rgbCache.get(label) ?? defaultRgb;
 
-			const colorStr = catInfo[label]?.color ?? '#cccccc';
-			tempColor.set(colorStr);
+			let r = c.r, g = c.g, b = c.b;
 
-			const isInUnstable       = hasUnstable && unstableSet.has(p.idx);
-			const isInDragged        = draggedSet.has(p.idx);
-			const isInHoveredCluster = hoveredCluster !== null && label === hoveredCluster;
-			if ((hasUnstable || hasAnySelection) && !isInUnstable && !isInDragged && !isInHoveredCluster) {
-				tempColor.lerp(whiteColor, 0.3);
+			if (needsFade) {
+				const isInUnstable       = hasUnstable && unstableSet.has(p.idx);
+				const isInDragged        = draggedSet.has(p.idx);
+				const isInHoveredCluster = hoveredCluster !== null && label === hoveredCluster;
+				if (!isInUnstable && !isInDragged && !isInHoveredCluster) {
+					// lerp 30% toward white
+					r = r + (1 - r) * 0.3;
+					g = g + (1 - g) * 0.3;
+					b = b + (1 - b) * 0.3;
+				}
 			}
 
-			arr[i * 3]     = tempColor.r;
-			arr[i * 3 + 1] = tempColor.g;
-			arr[i * 3 + 2] = tempColor.b;
+			arr[i * 3]     = r;
+			arr[i * 3 + 1] = g;
+			arr[i * 3 + 2] = b;
 		}
 		return arr;
 	});
@@ -188,14 +207,17 @@
 		if (!geo || pts.length === 0) return;
 
 		const posAttr = geo.getAttribute('position') as THREE.BufferAttribute | null;
-		if (!posAttr || posAttr.count !== pts.length / 3) {
+		const pointCount = pts.length / 3;
+		if (!posAttr || posAttr.count !== pointCount) {
+			// Point count changed: full attribute rebuild + bounding sphere required
 			geo.setAttribute('position', new THREE.BufferAttribute(pts, 3));
+			geo.computeBoundingSphere();
 		} else {
+			// Same count: in-place update, skip expensive bounding sphere recompute
 			posAttr.set(pts);
 			posAttr.needsUpdate = true;
 		}
 
-		geo.computeBoundingSphere();
 		invalidate();
 	});
 
@@ -249,13 +271,12 @@
 		const y = positions[renderIdx * 3 + 1];
 
 		const label = String(appState.labelsOfSelectedCat[appState.selectedPointIdx] ?? '');
-		const info  = appState.categoriesInfo['Label']?.[label];
-		const color = new THREE.Color(info?.color ?? '#cccccc');
+		const c = rgbCache.get(label) ?? _defaultRgb;
 
 		return {
 			position: new Float32Array([x, y, 0.5]),
 			// White ring behind + cluster color fill — two stacked proxy meshes
-			fillColor:   new Float32Array([color.r, color.g, color.b]),
+			fillColor:   new Float32Array([c.r, c.g, c.b]),
 			ringColor:   new Float32Array([0.2, 0.2, 0.2])
 		};
 	});
@@ -272,16 +293,22 @@
 		const srcX = positions[srcRenderIdx * 3];
 		const srcY = positions[srcRenderIdx * 3 + 1];
 
-		const segments: number[] = [];
-		for (const tgtIdx of appState.targetPointsIdx) {
+		const targets = appState.targetPointsIdx;
+		// Pre-allocate: each edge = 2 vertices × 3 floats
+		const buf = new Float32Array(targets.length * 6);
+		let count = 0;
+		for (const tgtIdx of targets) {
 			const tRenderIdx = pointIndexMap.get(tgtIdx);
 			if (tRenderIdx === undefined) continue;
-			// Pair: start → end
-			segments.push(srcX, srcY, 0.5);
-			segments.push(positions[tRenderIdx * 3], positions[tRenderIdx * 3 + 1], 0.5);
+			const base = count * 6;
+			buf[base]     = srcX; buf[base + 1] = srcY; buf[base + 2] = 0.5;
+			buf[base + 3] = positions[tRenderIdx * 3];
+			buf[base + 4] = positions[tRenderIdx * 3 + 1];
+			buf[base + 5] = 0.5;
+			count++;
 		}
 
-		return segments.length ? new Float32Array(segments) : null;
+		return count > 0 ? buf.subarray(0, count * 6) as Float32Array : null;
 	});
 
 	// ==========================================
@@ -429,7 +456,9 @@
 
 	function handlePointerMove(e: any) {
 		if (!hoverEnabled || e.index === undefined) return;
-		_pendingHoverIdx = appState.pointsToRender[e.index].idx;
+		// Cache the reactive reference locally to avoid repeated proxy tracking per event
+		const pts = appState.pointsToRender;
+		_pendingHoverIdx = pts[e.index].idx;
 		document.body.style.cursor = 'pointer';
 		if (_hoverRafHandle !== null) return; // already scheduled
 		_hoverRafHandle = requestAnimationFrame(() => {

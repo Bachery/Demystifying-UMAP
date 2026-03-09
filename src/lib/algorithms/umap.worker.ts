@@ -19,6 +19,7 @@ let umap: UMAP | null = null;
 let currentEpoch = 0;
 let totalEpochs = 0;
 let isRunning = false;
+let iterationsPerBatch = 50; // dynamically set based on data size
 
 self.onmessage = (e: MessageEvent<WorkerMessage>) => {
 	const msg = e.data;
@@ -42,6 +43,11 @@ function initUMAP(data: number[][], params: UMAPParams, initPositions?: number[]
 	currentEpoch = 0;
 	totalEpochs = params.nEpochs || 500;
 	isRunning = true;
+
+	// Adaptive batch size: smaller datasets benefit from larger batches (less setTimeout overhead),
+	// larger datasets need smaller batches to keep the UI responsive.
+	const n = data.length;
+	iterationsPerBatch = n < 500 ? 200 : n < 2000 ? 100 : n < 10000 ? 50 : 20;
 
 	// 实例化 UMAP
 	// 注意：umap-js 的 API 可能需要根据版本微调，但通常如下
@@ -76,8 +82,6 @@ function initUMAP(data: number[][], params: UMAPParams, initPositions?: number[]
 function runEpochs() {
 	if (!umap || !isRunning) return;
 
-	const iterationsPerBatch = 50; 
-	
 	for (let i = 0; i < iterationsPerBatch; i++) {
 		if (currentEpoch >= totalEpochs) {
 			isRunning = false;

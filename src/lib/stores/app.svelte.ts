@@ -80,26 +80,29 @@ export class AppState {
 		// 增加安全检查：如果为空，直接返回
 		if (!curr || curr.length === 0 || !this.usingRows || this.usingRows.length === 0) return [];
 
-		const usingSet = new Set(this.usingRows);
-		return curr
-			.filter((_, idx) => usingSet.has(idx))
-			.map((point, i) => {
-				const actualIdx = this.usingRows[i];
-				const cluster = this.labelsOfSelectedCat[actualIdx] || '';
+		const t = this.animationProgress;
+		const hasPrev = t < 1.0 && prev !== null && prev.length > 0;
+		const labels = this.labelsOfSelectedCat;
 
-				let x = point[0];
-				let y = point[1];
+		const result: { idx: number; x: number; y: number; cluster: string }[] = new Array(this.usingRows.length);
+		for (let i = 0; i < this.usingRows.length; i++) {
+			const actualIdx = this.usingRows[i];
+			const point = curr[actualIdx];
+			if (!point) continue;
 
-				// 增加对 prev 和 prev[actualIdx] 的绝对安全检查
-				if (this.animationProgress < 1.0 && prev && prev.length > actualIdx) {
-					const prevPoint = prev[actualIdx];
-					if (prevPoint && prevPoint.length >= 2) {
-						x = prevPoint[0] + (x - prevPoint[0]) * this.animationProgress;
-						y = prevPoint[1] + (y - prevPoint[1]) * this.animationProgress;
-					}
+			let x = point[0];
+			let y = point[1];
+
+			if (hasPrev && prev!.length > actualIdx) {
+				const prevPoint = prev![actualIdx];
+				if (prevPoint && prevPoint.length >= 2) {
+					x = prevPoint[0] + (x - prevPoint[0]) * t;
+					y = prevPoint[1] + (y - prevPoint[1]) * t;
 				}
-				return { idx: actualIdx, x, y, cluster };
-			});
+			}
+			result[i] = { idx: actualIdx, x, y, cluster: labels[actualIdx] || '' };
+		}
+		return result;
 	});
 
 	// ==========================================
@@ -118,12 +121,17 @@ export class AppState {
 	unstablePointsIdx = $derived.by(() => {
 		if (!this.ifHighlightUnstablePoints || !this.currentProjectionData.length || !this.previousProjectionData.length) return [];
 		const unstablePoints: number[] = [];
-		const threshold = 1.0; 
-		for (let i = 0; i < this.currentProjectionData.length; i++) {
-			const curr = this.currentProjectionData[i];
-			const prev = this.previousProjectionData[i];
+		const threshold2 = 1.0; // squared Euclidean distance threshold (threshold=1.0 → threshold²=1.0)
+		const currData = this.currentProjectionData;
+		const prevData = this.previousProjectionData;
+		const len = currData.length;
+		for (let i = 0; i < len; i++) {
+			const curr = currData[i];
+			const prev = prevData[i];
 			if (curr && prev) {
-				if (Math.abs(curr[0]-prev[0]) > threshold || Math.abs(curr[1]-prev[1]) > threshold) {
+				const dx = curr[0] - prev[0];
+				const dy = curr[1] - prev[1];
+				if (dx * dx + dy * dy > threshold2) {
 					unstablePoints.push(i);
 				}
 			}
@@ -148,16 +156,16 @@ export class AppState {
 			(idx) => String(this.labelsOfSelectedCat[idx] ?? '') === label
 		);
 
-		const clickedIsSelected = this.draggedPointsIdx.includes(pointIdx);
+		const draggedSet = new Set(this.draggedPointsIdx);
+		const clickedIsSelected = draggedSet.has(pointIdx);
 
 		if (clickedIsSelected) {
 			// Remove cluster members from the selection
 			const clusterSet = new Set(clusterPoints);
 			this.draggedPointsIdx = this.draggedPointsIdx.filter((idx) => !clusterSet.has(idx));
 		} else {
-			// Add cluster members not already in the selection
-			const existingSet = new Set(this.draggedPointsIdx);
-			const toAdd = clusterPoints.filter((idx) => !existingSet.has(idx));
+			// Add cluster members not already in the selection (reuse draggedSet built above)
+			const toAdd = clusterPoints.filter((idx) => !draggedSet.has(idx));
 			this.draggedPointsIdx = [...this.draggedPointsIdx, ...toAdd];
 		}
 	}
@@ -309,11 +317,9 @@ export class AppState {
 		const ctx = canvas.getContext('2d');
 		if (!ctx) return '';
 
-		ctx.fillStyle = '#ffffff';
-		ctx.fillRect(0, 0, SIZE, SIZE);
-
 		let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-		for (const [x, y] of embedding) {
+		for (let i = 0; i < embedding.length; i++) {
+			const x = embedding[i][0], y = embedding[i][1];
 			if (x < minX) minX = x; if (x > maxX) maxX = x;
 			if (y < minY) minY = y; if (y > maxY) maxY = y;
 		}
@@ -321,16 +327,38 @@ export class AppState {
 		const scale = draw / (Math.max(maxX - minX, maxY - minY) || 1);
 		const catInfo = this.categoriesInfo['Label'] || {};
 
-		for (let i = 0; i < embedding.length; i++) {
-			const [x, y] = embedding[i];
-			const px = PAD + (x - minX) * scale;
-			const py = PAD + (maxY - y) * scale; // Y flip
-			const label = String(this.labelsOfSelectedCat[i] ?? '');
-			ctx.fillStyle = catInfo[label]?.color ?? '#cccccc';
-			ctx.beginPath();
-			ctx.arc(px, py, 1.2, 0, Math.PI * 2);
-			ctx.fill();
+		// Pre-parse hex colors to integer RGB once per category (not per point)
+		const rgbInt = new Map<string, [number, number, number]>();
+		for (const [label, info] of Object.entries(catInfo)) {
+			const hex = ((info as any).color ?? '#cccccc').replace('#', '');
+			rgbInt.set(label, [
+				parseInt(hex.slice(0, 2), 16),
+				parseInt(hex.slice(2, 4), 16),
+				parseInt(hex.slice(4, 6), 16)
+			]);
 		}
+		const defaultRgb: [number, number, number] = [204, 204, 204];
+		const labels = this.labelsOfSelectedCat;
+
+		// Write pixels directly via ImageData — bypasses Canvas 2D path renderer entirely
+		const imageData = ctx.createImageData(SIZE, SIZE);
+		const data = imageData.data;
+		// Fill white background (default is transparent/black)
+		data.fill(255);
+
+		for (let i = 0; i < embedding.length; i++) {
+			const px = Math.round(PAD + (embedding[i][0] - minX) * scale);
+			const py = Math.round(PAD + (maxY - embedding[i][1]) * scale); // Y flip
+			if (px < 0 || px >= SIZE || py < 0 || py >= SIZE) continue;
+			const label = String(labels[i] ?? '');
+			const rgb = rgbInt.get(label) ?? defaultRgb;
+			const base = (py * SIZE + px) * 4;
+			data[base]     = rgb[0];
+			data[base + 1] = rgb[1];
+			data[base + 2] = rgb[2];
+			// data[base + 3] = 255; // already set by fill(255)
+		}
+		ctx.putImageData(imageData, 0, 0);
 		return canvas.toDataURL('image/png');
 	}
 
@@ -344,11 +372,11 @@ export class AppState {
 	commitDragAsNewHistory(draggedIndices: number[], dx: number, dy: number) {
 		if (this.currentProjectionIdx === -1) return;
 		const raw = $state.snapshot(this.history[this.currentProjectionIdx].data) as number[][];
-		const newData = raw.map(row => [row[0], row[1]]);
+		// Shallow-copy outer array; only create new inner arrays for dragged points (O(k) vs O(n))
+		const newData = raw.slice();
 		for (const idx of draggedIndices) {
-			if (newData[idx]) {
-				newData[idx][0] += dx;
-				newData[idx][1] += dy;
+			if (raw[idx]) {
+				newData[idx] = [raw[idx][0] + dx, raw[idx][1] + dy];
 			}
 		}
 		const thumbnail = this.generateThumbnail(newData);
@@ -397,9 +425,13 @@ export class AppState {
 		}
 
 		if (type === 'continuous') {
-			const numericValues = [...countMap.keys()].map(Number);
-			const minVal = Math.min(...numericValues);
-			const maxVal = Math.max(...numericValues);
+			// Use loop instead of spread to avoid potential stack overflow on large datasets
+			let minVal = Infinity, maxVal = -Infinity;
+			for (const key of countMap.keys()) {
+				const v = Number(key);
+				if (v < minVal) minVal = v;
+				if (v > maxVal) maxVal = v;
+			}
 			const range = maxVal - minVal || 1;
 			this.continuousRange = { min: minVal, max: maxVal };
 
