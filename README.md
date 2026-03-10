@@ -126,4 +126,4 @@ If this repository is useful in your research, please cite the paper above. A fo
 
 ## License
 
-This repository does not currently include a license file. Add an explicit license before reusing or redistributing the code.
+This project is licensed under the MIT License. See the `LICENSE` file for details.
