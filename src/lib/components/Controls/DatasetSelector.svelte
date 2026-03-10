@@ -90,20 +90,20 @@
 			generatedType: 'categorical'
 		},
 		WorldMap: {
-			description:
-				'<b>Map Projection Analogy:</b> A 2D manifold embedded in 3D. Useful for comparing how UMAP reshapes known geography under different neighbor settings and initializations.',
+			// description:
+			// 	'<b>Map Projection Analogy:</b> A 2D manifold embedded in 3D. Useful for comparing how UMAP reshapes known geography under different neighbor settings and initializations.',
 			loadable: true,
 			generatedType: 'categorical'
 		},
 		WorldMapRoll: {
-			description:
-				'<b>Rolled Geography:</b> A world map wrapped into a roll to stress-test how well UMAP can recover a known 2D structure from a curved embedding.',
+			// description:
+			// 	'<b>Rolled Geography:</b> A world map wrapped into a roll to stress-test how well UMAP can recover a known 2D structure from a curved embedding.',
 			loadable: true,
 			generatedType: 'categorical'
 		},
 		WorldMapGlobe: {
-			description:
-				'<b>Globe Flattening:</b> Geographic data placed on a sphere. Compare the 3D globe with the learned 2D projection to see where topology and distance distortions appear.',
+			// description:
+			// 	'<b>Globe Flattening:</b> Geographic data placed on a sphere. Compare the 3D globe with the learned 2D projection to see where topology and distance distortions appear.',
 			loadable: true,
 			generatedType: 'categorical'
 		},
