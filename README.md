@@ -86,25 +86,6 @@ Notes:
 - Bundled datasets and precomputed spectral initializations live in `static/datasets/`.
 - The app does not require a backend; datasets are loaded from static assets or generated client-side.
 
-## Tech Stack
-
-- SvelteKit
-- TypeScript
-- Tailwind CSS
-- Three.js + Threlte
-- `umap-js`
-- Web Workers for non-blocking optimization
-- Vercel for deployment
-
-## Project Structure
-
-```text
-src/lib/algorithms/   dataset generators, loaders, PCA init, UMAP worker
-src/lib/components/   linked 2D/3D views and control panels
-src/lib/stores/       application state, interaction state, projection history
-static/datasets/      bundled datasets and spectral initialization files
-```
-
 ## Research Context
 
 This project accompanies the paper:
@@ -122,7 +103,7 @@ Uniform Manifold Approximation and Projection (UMAP) has become a ubiquitous too
 
 ## Citation
 
-If this repository is useful in your research, please cite the paper above. A formatted citation entry can be added once the final publication metadata is available.
+If this repository is useful in your research, please cite the paper above. A formatted citation entry will be added once the final publication metadata is available.
 
 ## License
 
