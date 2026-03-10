@@ -17,7 +17,7 @@
 		await appState.runUMAP();
 	}
 
-	// Auto-select 'current' init when the active history entry is steered
+	// Prefer the current embedding when re-running from a steered history entry.
 	$effect(() => {
 		const entry = appState.history[appState.currentProjectionIdx];
 		if (entry?.steered) {
@@ -29,7 +29,7 @@
 <div class="border-t border-gray-200/50 bg-white/80 p-4 backdrop-blur-md">
 	{#if appState.dataset}
 		<div class="mb-3">
-			<!-- Label row with info tooltip -->
+			<!-- Initialization label and tooltip -->
 			<div class="mb-1.5 flex items-center gap-1.5">
 				<span class="text-xs font-medium tracking-wide text-gray-500 uppercase">Initialization</span
 				>
@@ -51,7 +51,7 @@
 				</div>
 			</div>
 
-			<!-- Segmented control -->
+			<!-- Initialization segmented control -->
 			<div class="flex overflow-hidden rounded-md border border-gray-200 text-xs font-medium">
 				{#each initMethods as method (method)}
 					{@const isActive = appState.initMethod === method}

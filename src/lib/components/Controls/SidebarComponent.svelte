@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { slide } from 'svelte/transition';
 
-	// Svelte 5 接收 props 的新写法
 	let { title, initiallyExpanded = true, children } = $props();
 
 	// svelte-ignore state_referenced_locally

@@ -1,7 +1,6 @@
 <script lang="ts">
 	const githubUrl = 'https://github.com/Bachery/Demystifying-UMAP';
 	const paperUrl = 'https://vismeetsai.github.io/';
-	const liveDemoUrl = 'https://interactive-umap-diagnostics.vercel.app/';
 </script>
 
 <header
@@ -18,18 +17,18 @@
 					Demystifying UMAP Artifacts
 				</h1>
 				<div class="flex flex-wrap items-center gap-2">
-					<a 
-						href="https://pacificvis2026.github.io/" 
-						target="_blank" 
-						class="px-2.5 py-1 bg-blue-50 text-blue-600 border border-blue-100 text-[10px] font-bold uppercase tracking-wider rounded-full hover:bg-blue-100 transition-colors hidden sm:block"
+					<a
+						href="https://pacificvis2026.github.io/"
+						target="_blank"
+						class="hidden rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-[10px] font-bold tracking-wider text-blue-600 uppercase transition-colors hover:bg-blue-100 sm:block"
 						title="Accepted by PacificVis 2026 & Information Visualization"
 					>
 						PacificVis 2026
 					</a>
-					<a 
-						href="https://vismeetsai.github.io/" 
-						target="_blank" 
-						class="px-2.5 py-1 bg-blue-50 text-blue-600 border border-blue-100 text-[10px] font-bold uppercase tracking-wider rounded-full hover:bg-blue-100 transition-colors hidden sm:block"
+					<a
+						href="https://vismeetsai.github.io/"
+						target="_blank"
+						class="hidden rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-[10px] font-bold tracking-wider text-blue-600 uppercase transition-colors hover:bg-blue-100 sm:block"
 						title="Accepted by PacificVis 2026 & Information Visualization"
 					>
 						Vis Meets AI 2026
@@ -37,18 +36,12 @@
 				</div>
 			</div>
 			<p class="mt-1 max-w-3xl text-xs leading-5 text-slate-500 sm:text-sm">
-				Explore UMAP artifacts through linked 3D probes, 2D embeddings, and
-				human-in-the-loop layout steering.
+				Explore UMAP artifacts through linked 3D probes, 2D embeddings, and human-in-the-loop layout
+				steering.
 			</p>
 		</div>
 
 		<div class="flex flex-wrap items-center gap-2 sm:gap-3">
-			<!-- <div
-				class="hidden rounded-full border border-slate-200/80 bg-white/70 px-3 py-1.5 text-xs font-medium text-slate-500 shadow-sm md:flex"
-			>
-				3D Probes · UMAP-JS · Steering
-			</div> -->
-			
 			<a
 				href={paperUrl}
 				target="_blank"
@@ -65,7 +58,9 @@
 					stroke-linejoin="round"
 					aria-hidden="true"
 				>
-					<path d="M7 3.75h6.5L18.25 8.5V19a1.25 1.25 0 0 1-1.25 1.25H7A1.25 1.25 0 0 1 5.75 19V5A1.25 1.25 0 0 1 7 3.75Z" />
+					<path
+						d="M7 3.75h6.5L18.25 8.5V19a1.25 1.25 0 0 1-1.25 1.25H7A1.25 1.25 0 0 1 5.75 19V5A1.25 1.25 0 0 1 7 3.75Z"
+					/>
 					<path d="M13.5 3.75V8.5h4.75" />
 					<path d="M8.75 11h6.5" />
 					<path d="M8.75 14h6.5" />
@@ -87,26 +82,6 @@
 				</svg>
 				GitHub
 			</a>
-
-			<!-- <a
-				href={liveDemoUrl}
-				target="_blank"
-				rel="noreferrer"
-				class="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 px-3.5 py-2 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition-all hover:-translate-y-0.5 hover:shadow-xl hover:shadow-blue-600/25"
-			>
-				Live Demo
-				<svg
-					class="h-4 w-4"
-					viewBox="0 0 24 24"
-					fill="none"
-					stroke="currentColor"
-					stroke-width="1.8"
-					aria-hidden="true"
-				>
-					<path stroke-linecap="round" stroke-linejoin="round" d="M7 17L17 7" />
-					<path stroke-linecap="round" stroke-linejoin="round" d="M8 7h9v9" />
-				</svg>
-			</a> -->
 		</div>
 	</div>
 </header>

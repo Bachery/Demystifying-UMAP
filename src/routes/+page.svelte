@@ -74,7 +74,7 @@
 				</div>
 			{:else}
 				<div class="flex h-full w-full min-w-0 gap-4">
-					<!-- 3D View Placeholder -->
+					<!-- 3D placeholder panel -->
 					<div
 						class="relative flex h-full min-w-0 flex-1 flex-col items-center justify-center gap-4 rounded-2xl border border-gray-200/60 bg-white/50 shadow-sm backdrop-blur-sm select-none"
 					>
@@ -99,7 +99,7 @@
 							<p class="mt-1 text-xs text-gray-300">Load a dataset to visualize</p>
 						</div>
 					</div>
-					<!-- 2D View Placeholder -->
+					<!-- 2D placeholder panel -->
 					<div
 						class="relative flex h-full min-w-0 flex-1 flex-col items-center justify-center gap-4 overflow-hidden rounded-2xl border border-gray-200/60 bg-white/50 shadow-sm backdrop-blur-sm select-none"
 					>

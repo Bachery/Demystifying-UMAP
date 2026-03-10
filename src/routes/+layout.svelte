@@ -2,7 +2,6 @@
 	import { dev } from '$app/environment';
 	import { inject } from '@vercel/analytics';
 	import './layout.css';
-	// import favicon from '$lib/assets/favicon.svg';
 	import favicon from '/static/favicon/favicon.svg';
 
 	let { children } = $props();

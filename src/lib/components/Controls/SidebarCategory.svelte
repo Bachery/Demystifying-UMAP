@@ -7,7 +7,6 @@
 	// svelte-ignore state_referenced_locally
 	let isExpanded = $state(initiallyExpanded);
 
-	// 使用 $derived 从全局状态读取 categoriesInfo
 	let categoryInfo = $derived(appState.categoriesInfo[categoryName] || {});
 	let clustersNames = $derived(Object.keys(categoryInfo));
 </script>
@@ -27,7 +26,7 @@
 	{#if isExpanded}
 		<div class="mt-2 ml-4" transition:slide={{ duration: 150 }}>
 			{#if appState.dataset?.type === 'continuous' && appState.continuousRange}
-				<!-- Gradient color bar for continuous labels: blue (min) → red (max) -->
+				<!-- Gradient bar for continuous labels, from blue at the minimum to red at the maximum. -->
 				<div
 					class="h-4 w-full rounded shadow-inner"
 					style="background: linear-gradient(to right, hsl(240,85%,50%), hsl(180,85%,50%), hsl(120,85%,50%), hsl(60,85%,50%), hsl(0,85%,50%));"

@@ -1,4 +1,3 @@
-// src/lib/stores/app.svelte.ts
 import { type DatasetResult, DatasetLoader } from '$lib/algorithms/loader';
 import type { UMAPParams, WorkerResponseMessage } from '$lib/algorithms/umap.worker';
 import UmapWorker from '$lib/algorithms/umap.worker?worker';
@@ -22,7 +21,7 @@ type ProjectionHistoryEntry = {
 
 export class AppState {
 	// ==========================================
-	// 1. 基础数据与表格逻辑 (Data Table & Filtering)
+	// 1. Dataset state and filtering
 	// ==========================================
 	dataset = $state<DatasetResult | null>(null);
 	dataMatrix = $state<number[][]>([]);
@@ -34,7 +33,7 @@ export class AppState {
 	labelsOfSelectedCat = $state<string[]>([]);
 
 	// ==========================================
-	// 2. UMAP 参数与状态 (UMAP Parameters & Status)
+	// 2. UMAP parameters and run state
 	// ==========================================
 	params = $state<UMAPParams>({
 		nNeighbors: 15,
@@ -47,7 +46,7 @@ export class AppState {
 	initMethod = $state<'random' | 'pca' | 'spectral' | 'current'>('pca');
 	isLocalDataset = $derived.by(() => this.dataset?.source === 'local');
 
-	// 计算状态 (补全了这里)
+	// Execution status.
 	isCalculating = $state(false);
 	isKnnDone = $state(false);
 	currentEpoch = $state(0);
@@ -57,7 +56,7 @@ export class AppState {
 	private activeRunId = 0;
 
 	// ==========================================
-	// 3. 投影历史与动画 (History & Morphing)
+	// 3. Projection history and morphing
 	// ==========================================
 	history = $state<ProjectionHistoryEntry[]>([]);
 	currentProjectionIdx = $state(-1);
@@ -80,7 +79,7 @@ export class AppState {
 		const curr = this.currentProjectionData;
 		const prev = this.previousProjectionData;
 
-		// 增加安全检查：如果为空，直接返回
+		// Guard against empty projections or filtered row sets.
 		if (!curr || curr.length === 0 || !this.usingRows || this.usingRows.length === 0) return [];
 
 		const t = this.animationProgress;
@@ -111,7 +110,7 @@ export class AppState {
 	});
 
 	// ==========================================
-	// 4. 交互与高亮 (Interaction)
+	// 4. Interaction and highlighting
 	// ==========================================
 	selectedPointIdx = $state<number | null>(null);
 
@@ -125,7 +124,7 @@ export class AppState {
 		)
 			return [];
 		const unstablePoints: number[] = [];
-		const threshold2 = 1.0; // squared Euclidean distance threshold (threshold=1.0 → threshold²=1.0)
+		const threshold2 = 1.0; // Squared Euclidean threshold for instability detection.
 		const currData = this.currentProjectionData;
 		const prevData = this.previousProjectionData;
 		const len = currData.length;
@@ -155,7 +154,7 @@ export class AppState {
 		const label = String(this.labelsOfSelectedCat[pointIdx] ?? '');
 		if (!label) return;
 
-		// All points (within usingRows) that share the same cluster label
+		// All points within usingRows that share the same cluster label.
 		const clusterPoints = this.usingRows.filter(
 			(idx) => String(this.labelsOfSelectedCat[idx] ?? '') === label
 		);
@@ -166,18 +165,18 @@ export class AppState {
 		const clickedIsSelected = Boolean(draggedLookup[pointIdx]);
 
 		if (clickedIsSelected) {
-			// Remove cluster members from the selection
+			// Remove cluster members from the selection.
 			const clusterLookup = Object.fromEntries(clusterPoints.map((idx) => [idx, true] as const));
 			this.draggedPointsIdx = this.draggedPointsIdx.filter((idx) => !clusterLookup[idx]);
 		} else {
-			// Add cluster members not already in the selection (reuse draggedSet built above)
+			// Add cluster members that are not already selected.
 			const toAdd = clusterPoints.filter((idx) => !draggedLookup[idx]);
 			this.draggedPointsIdx = [...this.draggedPointsIdx, ...toAdd];
 		}
 	}
 
 	// ==========================================
-	// 5. 初始化与构造
+	// 5. Construction and setup
 	// ==========================================
 	constructor() {
 		this.initWorker();
@@ -221,7 +220,7 @@ export class AppState {
 	}
 
 	// ==========================================
-	// 6. 全局方法 (Actions)
+	// 6. Public actions
 	// ==========================================
 
 	setDataset(result: DatasetResult) {
@@ -234,23 +233,23 @@ export class AppState {
 		this.selectedPointIdx = null;
 		this.draggedPointsIdx = [];
 
-		// 停止正在运行的计算，防止旧结果污染新数据集的历史
+		// Stop any active run so stale results cannot leak into the new dataset history.
 		this.cancelActiveRun();
 
-		// 重置历史
+		// Reset history.
 		this.history = [];
 		this.currentProjectionIdx = -1;
 		this.previousProjectionIdx = -1;
 		this.animationProgress = 1.0;
 
-		// 根据数据来源设置默认初始化方式
+		// Choose a default initialization method based on the dataset source.
 		this.initMethod = result.source === 'local' ? 'spectral' : 'pca';
 	}
 
 	/**
-	 * 核心计算方法
-	 * 若未传入 manualInit，则尝试加载对应数据集的 spectral 初始化文件；
-	 * 文件不存在时回退到 umap-js 默认初始化。
+	 * Run UMAP for the active dataset.
+	 * Attempts to load a matching spectral initialization first and falls back
+	 * to the library default when no initialization file is available.
 	 */
 	async runUMAP() {
 		if (!this.dataMatrix.length || !this.worker) return;
@@ -261,10 +260,10 @@ export class AppState {
 		this.isCalculating = true;
 		this.totalEpochs = this.params.nEpochs;
 
-		// 确定初始化位置
+		// Resolve the initial embedding.
 		let initPositions: number[][] | undefined;
 
-		// 按用户选择的初始化方式
+		// Honor the selected initialization mode.
 		switch (this.initMethod) {
 			case 'spectral': {
 				const nn = this.params.nNeighbors;
@@ -303,12 +302,12 @@ export class AppState {
 			}
 		}
 
-		// 初始化位置确定后，立即渲染到 2D 画布
+		// Render the initial embedding immediately in the 2D view.
 		if (initPositions) {
 			this.realtimeEmbedding = initPositions;
 		}
 
-		// 发送给 Worker
+		// Hand the job off to the worker.
 		this.worker.postMessage({
 			type: 'INIT',
 			runId: this.activeRunId,
@@ -319,7 +318,7 @@ export class AppState {
 	}
 
 	/**
-	 * 停止计算
+	 * Stop the active UMAP run.
 	 */
 	stop() {
 		this.cancelActiveRun();
@@ -351,7 +350,7 @@ export class AppState {
 		const scale = draw / (Math.max(maxX - minX, maxY - minY) || 1);
 		const catInfo = this.categoriesInfo['Label'] || {};
 
-		// Pre-parse hex colors to integer RGB once per category (not per point)
+		// Parse category colors once per label instead of once per point.
 		const rgbInt: Record<string, [number, number, number]> = {};
 		for (const [label, info] of Object.entries(catInfo)) {
 			const hex = (info.color || '#cccccc').replace('#', '');
@@ -364,15 +363,15 @@ export class AppState {
 		const defaultRgb: [number, number, number] = [204, 204, 204];
 		const labels = this.labelsOfSelectedCat;
 
-		// Write pixels directly via ImageData — bypasses Canvas 2D path renderer entirely
+		// Write pixels directly via ImageData instead of using the Canvas 2D path renderer.
 		const imageData = ctx.createImageData(SIZE, SIZE);
 		const data = imageData.data;
-		// Fill white background (default is transparent/black)
+		// Fill a white background because the default is transparent.
 		data.fill(255);
 
 		for (let i = 0; i < embedding.length; i++) {
 			const px = Math.round(PAD + (embedding[i][0] - minX) * scale);
-			const py = Math.round(PAD + (maxY - embedding[i][1]) * scale); // Y flip
+			const py = Math.round(PAD + (maxY - embedding[i][1]) * scale); // Flip Y for image space.
 			if (px < 0 || px >= SIZE || py < 0 || py >= SIZE) continue;
 			const label = String(labels[i] ?? '');
 			const rgb = rgbInt[label] ?? defaultRgb;
@@ -380,7 +379,6 @@ export class AppState {
 			data[base] = rgb[0];
 			data[base + 1] = rgb[1];
 			data[base + 2] = rgb[2];
-			// data[base + 3] = 255; // already set by fill(255)
 		}
 		ctx.putImageData(imageData, 0, 0);
 		return canvas.toDataURL('image/png');
@@ -396,7 +394,7 @@ export class AppState {
 	commitDragAsNewHistory(draggedIndices: number[], dx: number, dy: number) {
 		if (this.currentProjectionIdx === -1) return;
 		const raw = $state.snapshot(this.history[this.currentProjectionIdx].data) as number[][];
-		// Shallow-copy outer array; only create new inner arrays for dragged points (O(k) vs O(n))
+		// Shallow-copy the outer array and only clone rows for dragged points.
 		const newData = raw.slice();
 		for (const idx of draggedIndices) {
 			if (raw[idx]) {
@@ -414,7 +412,7 @@ export class AppState {
 	private finishCalculation(embedding: number[][]) {
 		const thumbnail = this.generateThumbnail(embedding);
 
-		// 1. 清除实时 embedding，正式存入 history
+		// 1. Clear the temporary embedding and store the finalized result.
 		this.realtimeEmbedding = null;
 
 		const snapshotParams = $state.snapshot(this.params);
@@ -425,14 +423,13 @@ export class AppState {
 		};
 		this.history.push(newRecord);
 
-		// 2. 更新指针：Previous 变为原来的 Current，Current 指向最新
+		// 2. Shift the history pointers so the newest result becomes current.
 		if (this.currentProjectionIdx !== -1) {
 			this.previousProjectionIdx = this.currentProjectionIdx;
 		}
 		this.currentProjectionIdx = this.history.length - 1;
 
-		// 3. 始终显示最新结果（animationProgress=1.0）
-		// MorphControl 滑条可让用户手动回看 Previous
+		// 3. Show the latest result by default; MorphControl can scrub back to previous.
 		this.animationProgress = 1.0;
 
 		console.log(
@@ -443,7 +440,7 @@ export class AppState {
 	private setupCategories(labels: Array<string | number>, type: DatasetResult['type']) {
 		const info: Record<string, CategoryInfo> = {};
 
-		// Count occurrences in O(n)
+		// Count label occurrences in O(n).
 		const counts: Record<string, number> = {};
 		for (const label of labels) {
 			const key = String(label);
@@ -451,7 +448,7 @@ export class AppState {
 		}
 
 		if (type === 'continuous') {
-			// Use loop instead of spread to avoid potential stack overflow on large datasets
+			// Use a loop instead of spread to avoid stack issues on large datasets.
 			let minVal = Infinity,
 				maxVal = -Infinity;
 			for (const key of Object.keys(counts)) {
@@ -463,8 +460,8 @@ export class AppState {
 			this.continuousRange = { min: minVal, max: maxVal };
 
 			for (const [labelStr, count] of Object.entries(counts)) {
-				const t = (Number(labelStr) - minVal) / range; // 0 → 1
-				// Blue (t=0, hue=240°) → Red (t=1, hue=0°)
+				const t = (Number(labelStr) - minVal) / range; // Normalize to [0, 1].
+				// Map low values to blue and high values to red.
 				const color = hsl((1 - t) * 240, 0.85, 0.5);
 				info[labelStr] = { cluster_id: 0, size: count, color: color.formatHex() };
 			}

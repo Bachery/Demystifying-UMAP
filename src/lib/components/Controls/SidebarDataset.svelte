@@ -41,7 +41,7 @@
 </div>
 
 <style>
-	/* 自定义一个极其优雅、极细的滚动条 */
+	/* Slim custom scrollbar styling. */
 	.custom-scrollbar::-webkit-scrollbar {
 		width: 6px;
 	}

@@ -6,7 +6,7 @@
 
 	let showGrid2D = $state(true);
 
-	// 交互状态
+	// Box selection state.
 	let isSelecting = $state(false);
 	let selectionStart = $state({ x: 0, y: 0 });
 	let selectionEnd = $state({ x: 0, y: 0 });
@@ -19,11 +19,11 @@
 		return { left, top, width, height };
 	});
 
-	// 拖拽逻辑 (Steering)
+	// Point drag state used for manual steering.
 	let isDraggingPoints = false;
 	let lastMousePos = { x: 0, y: 0 };
 
-	// Fast-path drag API from Scene2D (bypasses reactive chain during drag)
+	// Fast drag API exposed by Scene2D. It bypasses the reactive chain during drag.
 	let _sceneAPI: {
 		fastMoveDraggedPoints: (
 			renderIndices: number[],
@@ -42,7 +42,7 @@
 	let _dragRenderIndices: number[] = [];
 	let _accumDataDx = 0;
 	let _accumDataDy = 0;
-	let _justFinishedDrag = false; // suppresses the post-drag mouseup→click event
+	let _justFinishedDrag = false; // Suppresses the click fired immediately after drag end.
 	let _usingReactiveFallback = false;
 
 	function updateDraggedPoints(dataDx: number, dataDy: number) {
@@ -66,32 +66,31 @@
 	}
 
 	function handleMouseDown(e: MouseEvent) {
-		// 如果按住 Shift 或者是右键，启用框选
+		// Shift-drag or right-drag enters box selection mode.
 		if (e.shiftKey || e.button === 2) {
 			isSelecting = true;
 			const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
 			selectionStart = { x: e.clientX - rect.left, y: e.clientY - rect.top };
 			selectionEnd = { ...selectionStart };
-			e.preventDefault(); // 阻止默认右键菜单
+			e.preventDefault(); // Suppress the default context menu.
 		} else if (
 			appState.manualMode &&
 			appState.draggedPointsIdx.length > 0 &&
 			appState.selectedPointIdx !== null
 		) {
-			// 如果处于 Manual Mode 且 鼠标指着一个被选中的点 -> 开始拖拽
+			// In manual mode, dragging starts only from a selected point.
 			isDraggingPoints = true;
 			lastMousePos = { x: e.clientX, y: e.clientY };
 			_accumDataDx = 0;
 			_accumDataDy = 0;
 			_usingReactiveFallback = false;
-			// Disable hover detection for the entire drag: pointermove events keep firing
-			// during drag and would re-set selectedPointIdx, causing the proxy (which reads
-			// from the reactive positions array, NOT the fast-path GPU buffer) to linger
-			// at the original position and create a ghost artifact.
+			// Disable hover updates during drag. Pointer events continue firing and would
+			// reset selectedPointIdx from reactive positions instead of the fast GPU path,
+			// leaving the proxy marker behind and creating a ghost artifact.
 			_sceneAPI?.setHoverEnabled(false);
-			_sceneAPI?.setOrbitEnabled(false); // prevent camera from panning simultaneously
+			_sceneAPI?.setOrbitEnabled(false); // Prevent camera panning during point drag.
 
-			// Precompute render indices for dragged data indices (O(K), once per drag start)
+			// Precompute render indices once at drag start.
 			const pts = appState.pointsToRender;
 			const dataToRender: Record<number, number> = {};
 			for (let ri = 0; ri < pts.length; ri++) dataToRender[pts[ri].idx] = ri;
@@ -111,13 +110,12 @@
 			lastMousePos = { x: e.clientX, y: e.clientY };
 
 			if (_sceneAPI && _dragRenderIndices.length > 0) {
-				// Fast path: directly patch GPU buffer, no reactive chain.
-				// Returns camera-aware data delta for state commit on drag end.
+				// Update the GPU buffer directly and return the data-space delta for commit.
 				const { dataDx, dataDy } = _sceneAPI.fastMoveDraggedPoints(_dragRenderIndices, dx, dy);
 				_accumDataDx += dataDx;
 				_accumDataDy += dataDy;
 			} else {
-				// Fallback to reactive path (before Scene2D is ready)
+				// Fall back to the reactive path before Scene2D is ready.
 				updateDraggedPoints(dx * 0.05, -dy * 0.05);
 			}
 		}
@@ -125,12 +123,12 @@
 
 	function handleMouseUp() {
 		if (isSelecting) {
-			// 框选：宽/高 > 5px 才触发，避免误选
+			// Require a minimum rectangle size to avoid accidental selections.
 			if (selectionBox && selectionBox.width > 5 && selectionBox.height > 5) {
 				const hitIndices = _sceneAPI?.getPointsInScreenRect(selectionBox) ?? [];
 				if (hitIndices.length > 0) {
 					const existingSet = new Set(appState.draggedPointsIdx);
-					// 若框内所有点都已选中则整体取消，否则新增未选中的点
+					// Toggle the whole hit set off when every point is already selected.
 					const allSelected = hitIndices.every((idx) => existingSet.has(idx));
 					if (allSelected) {
 						const removeSet = new Set(hitIndices);
@@ -147,10 +145,10 @@
 		}
 		if (isDraggingPoints) {
 			isDraggingPoints = false;
-			_justFinishedDrag = true; // suppress the click event that fires after mouseup
+			_justFinishedDrag = true; // Suppress the click event fired after mouseup.
 			_sceneAPI?.setHoverEnabled(true);
-			_sceneAPI?.setOrbitEnabled(true); // re-enable camera pan
-			// Commit accumulated displacement as a new steered history entry
+			_sceneAPI?.setOrbitEnabled(true); // Re-enable camera panning.
+			// Commit the accumulated displacement as a new steered history entry.
 			if (_accumDataDx !== 0 || _accumDataDy !== 0) {
 				appState.commitDragAsNewHistory(appState.draggedPointsIdx, _accumDataDx, _accumDataDy);
 			}
@@ -166,7 +164,7 @@
 
 	async function handleScreenshot2D() {
 		showGrid2D = false;
-		// Wait two animation frames so Threlte re-renders without the grid
+		// Wait two animation frames so Threlte can redraw without the grid.
 		await new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())));
 		const canvas = document.querySelector('#canvas-2d canvas') as HTMLCanvasElement;
 		if (canvas) {
@@ -194,12 +192,12 @@
 	}
 
 	// ==========================================
-	// 视图变换：Flip X / Flip Y / Rotate 90° CW
-	// 使用 .map() 生成新数组引用，确保 Svelte 5 响应式链重新求值
+	// View transforms.
+	// Use .map() to create a fresh array reference so Svelte re-evaluates derived state.
 	// ==========================================
 	function applyToCurrentData(transform: (x: number, y: number) => [number, number]) {
 		if (appState.currentProjectionIdx === -1) return;
-		// $state.snapshot 返回普通数组（脱离 proxy），避免 map 中每次读取都经过 proxy 拦截
+		// Snapshot returns a plain array and avoids repeated proxy reads inside map().
 		const raw = $state.snapshot(appState.history[appState.currentProjectionIdx].data) as number[][];
 		const transformed = raw.map((row) => {
 			const [nx, ny] = transform(row[0], row[1]);
@@ -219,7 +217,7 @@
 	}
 
 	function handleRotate() {
-		// 90° 顺时针：(x, y) → (y, -x)
+		// Rotate 90 degrees clockwise: (x, y) -> (y, -x).
 		applyToCurrentData((x, y) => [y, -x]);
 	}
 </script>
@@ -248,7 +246,7 @@
 		<h3 class="text-xs font-bold tracking-wider text-gray-600 uppercase">UMAP Projection (2D)</h3>
 	</div>
 
-	<!-- Visual-only overlay: pointer-events-none so the Canvas beneath receives events -->
+	<!-- Visual overlay. Keep pointer events disabled so the canvas still receives input. -->
 	<div class="pointer-events-none absolute inset-0 z-10">
 		{#if selectionBox}
 			<div

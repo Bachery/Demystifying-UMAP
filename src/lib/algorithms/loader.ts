@@ -14,12 +14,10 @@ function closestNN(n: number): number {
 
 export class DatasetLoader {
 	/**
-	 * Load single .json dataset from static/datasets/
-	 * @param fileName
+	 * Load a single dataset JSON file from static/datasets.
 	 */
 	async load(fileName: string): Promise<DatasetResult> {
 		try {
-			// files in static/datasets/
 			const response = await fetch(`/datasets/${fileName}.json`);
 			if (!response.ok) {
 				throw new Error(`Failed to load dataset: ${response.statusText}`);
@@ -34,8 +32,7 @@ export class DatasetLoader {
 
 	/**
 	 * Try to load the pre-computed spectral initialization for a dataset.
-	 * Picks the file whose nn value is closest to nNeighbors.
-	 * Available nn values: [5, 15, 30, 50, 100, 200, 300, 500]
+	 * Selects the file whose nn value is closest to nNeighbors.
 	 * Returns null if the file does not exist or fails to load.
 	 */
 	async loadSpectralInit(datasetName: string, nNeighbors = 15): Promise<number[][] | null> {

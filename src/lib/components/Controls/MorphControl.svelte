@@ -29,7 +29,7 @@
 <div
 	class="flex flex-col gap-3 rounded-lg border border-gray-200/60 bg-gray-50/80 p-3 shadow-inner"
 >
-	<!-- Title row -->
+	<!-- Comparison header -->
 	<div class="flex items-center justify-between">
 		<h4 class="text-xs font-bold tracking-wide text-gray-500 uppercase">Result Comparison</h4>
 		<span class="font-mono text-[10px] text-gray-400">
@@ -37,9 +37,9 @@
 		</span>
 	</div>
 
-	<!-- Prev thumbnail + slider + Curr thumbnail -->
+	<!-- Comparison scrubber -->
 	<div class="flex items-center gap-2">
-		<!-- Prev -->
+		<!-- Previous result thumbnail -->
 		<div class="flex w-16 shrink-0 flex-col items-center gap-1">
 			<div
 				class="h-16 w-16 overflow-hidden rounded border-2 border-dashed border-blue-400 bg-white shadow-sm"
@@ -67,7 +67,7 @@
 			</span>
 		</div>
 
-		<!-- Slider -->
+		<!-- Morph slider -->
 		<div class="flex min-w-0 flex-[0.9] flex-col justify-center pt-1">
 			<input
 				type="range"
@@ -84,7 +84,7 @@
 			</div>
 		</div>
 
-		<!-- Curr -->
+		<!-- Current result thumbnail -->
 		<div class="flex w-16 shrink-0 flex-col items-center gap-1">
 			<div class="h-16 w-16 overflow-hidden rounded border-2 border-purple-500 bg-white shadow-md">
 				{#if appState.currentProjectionIdx !== -1 && appState.history[appState.currentProjectionIdx]?.thumbnail}
@@ -113,7 +113,7 @@
 		</div>
 	</div>
 
-	<!-- History strip -->
+	<!-- History thumbnails -->
 	{#if appState.history.length > 0}
 		<div class="flex flex-col gap-1">
 			<span class="text-[9px] font-semibold tracking-wide text-gray-400 uppercase">History</span>
@@ -173,7 +173,7 @@
 		</div>
 	{/if}
 
-	<!-- Params comparison -->
+	<!-- Parameter comparison -->
 	{#if appState.previousProjectionIdx !== -1}
 		<div class="overflow-hidden rounded border border-gray-100 bg-white/50">
 			<div class="grid grid-cols-[auto_1fr_1fr] font-mono text-[9px]">

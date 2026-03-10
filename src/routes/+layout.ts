@@ -1,2 +1,2 @@
 export const prerender = true;
-export const ssr = false; // client-side rendering only, since this involves many WebGL and computations
+export const ssr = false; // Render on the client because the app depends on WebGL and heavy computation.

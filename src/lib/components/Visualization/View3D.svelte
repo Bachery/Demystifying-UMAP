@@ -2,7 +2,7 @@
 	import { Canvas } from '@threlte/core';
 	import Scene3D from './Scene3D.svelte';
 	import { appState } from '$lib/stores/app.svelte';
-	import { WebGLRenderer } from 'three'; // [1] 新增引入
+	import { WebGLRenderer } from 'three';
 
 	let autoRotate = $state(false);
 
@@ -47,7 +47,7 @@
 		createRenderer={(canvas) => {
 			return new WebGLRenderer({
 				canvas,
-				preserveDrawingBuffer: true, // 关键：允许截图
+				preserveDrawingBuffer: true, // Keep framebuffer pixels available for screenshots.
 				antialias: true,
 				alpha: true
 			});

@@ -1,11 +1,10 @@
-// src/lib/algorithms/umap.worker.ts
 import { UMAP } from 'umap-js';
 
-// 定义消息类型，确保类型安全
+// Message types used between the UI thread and the worker.
 export type UMAPParams = {
 	nNeighbors: number;
 	minDist: number;
-	nComponents: number; // 通常是 2
+	nComponents: number; // Usually 2.
 	nEpochs: number;
 	spread?: number;
 };
@@ -19,7 +18,7 @@ export type WorkerMessage =
 			initPositions?: number[][];
 	  }
 	| { type: 'STOP'; runId: number }
-	| { type: 'STEP' }; // 请求跑一步
+	| { type: 'STEP' }; // Request a single execution batch.
 
 export type WorkerResponseMessage =
 	| { type: 'KNN_DONE'; runId: number }
@@ -34,7 +33,7 @@ let umap: UMAP | null = null;
 let currentEpoch = 0;
 let totalEpochs = 0;
 let isRunning = false;
-let iterationsPerBatch = 50; // dynamically set based on data size
+let iterationsPerBatch = 50; // Adjusted dynamically based on dataset size.
 let activeRunId = 0;
 
 self.onmessage = (e: MessageEvent<WorkerMessage>) => {
@@ -65,13 +64,12 @@ function initUMAP(runId: number, data: number[][], params: UMAPParams, initPosit
 	isRunning = true;
 	activeRunId = runId;
 
-	// Adaptive batch size: smaller datasets benefit from larger batches (less setTimeout overhead),
-	// larger datasets need smaller batches to keep the UI responsive.
+	// Smaller datasets benefit from larger batches, while larger datasets need
+	// shorter batches to keep the UI responsive.
 	const n = data.length;
 	iterationsPerBatch = n < 500 ? 200 : n < 2000 ? 100 : n < 10000 ? 50 : 20;
 
-	// 实例化 UMAP
-	// 注意：umap-js 的 API 可能需要根据版本微调，但通常如下
+	// Instantiate UMAP. The exact option shape may vary slightly by umap-js version.
 	umap = new UMAP({
 		nNeighbors: params.nNeighbors,
 		minDist: params.minDist,
@@ -83,11 +81,9 @@ function initUMAP(runId: number, data: number[][], params: UMAPParams, initPosit
 	postMessage({ type: 'KNN_DONE', runId } satisfies WorkerResponseMessage);
 
 	if (initPositions && initPositions.length > 0) {
-		// 必须原地修改 embedding，不能替换引用。
-		// umap-js 的 optimizationState.headEmbedding 与 this.embedding 是同一引用，
-		// step() 通过 headEmbedding 就地更新坐标。直接赋值 umap.embedding = newArray
-		// 会断开该引用，导致 step() 在旧随机初始化上优化而 getEmbedding() 永远返回
-		// 未被优化的初始值。
+		// Mutate the embedding in place instead of replacing the array reference.
+		// umap-js updates coordinates through a shared embedding reference, so assigning
+		// a new array here would disconnect optimization from getEmbedding().
 		const embedding = (umap as unknown as UMAPEmbeddingHandle).embedding;
 		const n = Math.min(embedding.length, initPositions.length);
 		for (let i = 0; i < n; i++) {
@@ -96,7 +92,7 @@ function initUMAP(runId: number, data: number[][], params: UMAPParams, initPosit
 		}
 	}
 
-	// 开始循环
+	// Start batched execution.
 	runEpochs(runId);
 }
 
@@ -122,7 +118,7 @@ function runEpochs(runId: number) {
 		currentEpoch++;
 	}
 
-	// 渲染还是很吃时间，不发中间结果，只发初始化和最终结果
+	// Rendering is still expensive, so only progress and final results are emitted.
 	postMessage({
 		type: 'UPDATE',
 		runId,

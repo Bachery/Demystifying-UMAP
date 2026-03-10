@@ -7,12 +7,11 @@
 
 	const { size, invalidate } = useThrelte();
 
-	// Store interactivity context so we can tune raycaster threshold.
-	// Default threshold = 1 world unit is far too large with sizeAttenuation=false:
-	// as the user zooms in, the visual point radius shrinks (stays 6px) but the
-	// threshold stays fixed in world units, causing picks to trigger far off-center
-	// (the "upper-right offset" symptom). We recompute threshold reactively based
-	// on zoom so it always matches ~4px in world-space.
+	// Store the interactivity context so the raycaster threshold can be tuned.
+	// With sizeAttenuation=false, a fixed 1 world-unit threshold is too large. As
+	// the user zooms in, the visible point radius stays at 6 px while the world-space
+	// radius shrinks, which makes hover picks land noticeably off-center. The threshold
+	// is recomputed from zoom so it stays close to a 4 px world-space radius.
 	const interactivityCtx = interactivity();
 
 	type IndexedPointerEvent = {
@@ -48,21 +47,20 @@
 		onReady?: (api: SceneAPI) => void;
 	} = $props();
 
-	// Orthographic camera ref — updated when canvas resizes
+	// Orthographic camera reference, updated on resize.
 	let cameraRef = $state<THREE.OrthographicCamera | undefined>(undefined);
-	// Main geometry ref — mutated in-place for perf (avoids full buffer recreate on UMAP frames)
+	// Main geometry reference, mutated in place to avoid rebuilding buffers on each UMAP frame.
 	let geometryRef = $state<THREE.BufferGeometry | undefined>(undefined);
 
-	// Cached data-to-world transform from the positions derived.
-	// Used by fastMoveDraggedPoints to convert screen pixels → world units.
+	// Cached data-to-world scale derived from positions.
+	// Used by fastMoveDraggedPoints to convert screen pixels to world units.
 	let _worldScale = 1;
 
-	// Disabled while dragging points so OrbitControls doesn't pan the camera simultaneously
+	// Disable OrbitControls while dragging points so the camera does not pan at the same time.
 	let orbitEnabled = $state(true);
 
-	// Reactive zoom — updated via OrbitControls change event so $effect can track it.
-	// We can't read cameraRef.zoom directly in $effect because THREE.js mutations
-	// don't trigger Svelte reactivity.
+	// Reactive zoom, updated from OrbitControls change events.
+	// THREE.js mutates cameraRef.zoom in place, so Svelte cannot track it directly.
 	let cameraZoom = $state(1);
 
 	const HALF_WORLD = 110;
@@ -78,26 +76,22 @@
 		cameraRef.updateProjectionMatrix();
 	});
 
-	// Reactively keep raycaster threshold in sync with zoom and DPR.
-	// Points use sizeAttenuation=false (size=6 device pixels fixed), so the world-unit
-	// radius shrinks as zoom increases.
-	// THREE.js gl_PointSize is in device pixels, so visual radius = 3 device pixels.
-	// $size.height is CSS pixels → divide by devicePixelRatio to get world-per-device-px.
-	// Uses cameraZoom ($state) instead of cameraRef.zoom directly because OrbitControls
-	// mutates the THREE.js object in-place and Svelte won't track that.
+	// Keep the raycaster threshold in sync with zoom and device pixel ratio.
+	// Points use sizeAttenuation=false, so their visual radius stays fixed in device
+	// pixels while the world-space radius shrinks as zoom increases.
 	$effect(() => {
 		const zoom = cameraZoom;
 		const dpr = typeof window !== 'undefined' ? (window.devicePixelRatio ?? 1) : 1;
 		const aspect = $size.width / $size.height;
 		const halfH = HALF_WORLD / Math.min(1, aspect);
-		// world units per device pixel
+		// World units per device pixel.
 		const worldPerDevPx = (2 * halfH) / ($size.height * dpr * zoom);
-		// threshold = visual radius (3 dev px) + 0.5 dev px tolerance
+		// Use a 3 px radius plus a small tolerance.
 		interactivityCtx.raycaster.params.Points = { threshold: worldPerDevPx * 3.5 };
 	});
 
 	// ==========================================
-	// 1. Positions — scaled & centred to ±HALF_WORLD
+	// 1. Position buffer.
 	// ==========================================
 	let positions = $derived.by(() => {
 		const points = appState.pointsToRender;
@@ -124,7 +118,7 @@
 		const targetRange = 200;
 		const scale = targetRange / Math.max(rangeX, rangeY);
 
-		// Cache for fast-path drag updates
+		// Cache the scale for fast drag updates.
 		_worldScale = scale;
 
 		for (let i = 0; i < points.length; i++) {
@@ -136,7 +130,7 @@
 	});
 
 	// ==========================================
-	// 2. Index map — fast lookup from data-idx → render-idx
+	// 2. Index map.
 	// ==========================================
 	let pointIndexMap = $derived.by(() => {
 		const indexMap: Record<number, number> = {};
@@ -147,7 +141,7 @@
 	});
 
 	// ==========================================
-	// 2.5 RGB cache — rebuilt only when category info changes (not on hover/select)
+	// 2.5 RGB cache.
 	// ==========================================
 	const _tcache = new THREE.Color();
 	let rgbCache = $derived.by(() => {
@@ -162,7 +156,7 @@
 	const _defaultRgb = { r: 0.8, g: 0.8, b: 0.8 };
 
 	// ==========================================
-	// 3. Colors — unified fading logic
+	// 3. Color buffer.
 	// ==========================================
 	let colors = $derived.by(() => {
 		const points = appState.pointsToRender;
@@ -179,11 +173,11 @@
 		const unstableLookup = Object.fromEntries(unstableList.map((idx) => [idx, true] as const));
 		const defaultRgb = _defaultRgb;
 
-		// Fading is active only when something is hovered OR selected
+		// Fade only when something is hovered or selected.
 		const hasAnySelection = selectedIdx !== null || draggedList.length > 0;
 		const needsFade = hasUnstable || hasAnySelection;
 
-		// Which cluster is hovered?
+		// Resolve the hovered cluster label.
 		const hoveredCluster =
 			selectedIdx !== null ? String(appState.labelsOfSelectedCat[selectedIdx] ?? '') : null;
 
@@ -201,7 +195,7 @@
 				const isInDragged = Boolean(draggedLookup[p.idx]);
 				const isInHoveredCluster = hoveredCluster !== null && label === hoveredCluster;
 				if (!isInUnstable && !isInDragged && !isInHoveredCluster) {
-					// lerp 30% toward white
+					// Fade 30% toward white.
 					r = r + (1 - r) * 0.3;
 					g = g + (1 - g) * 0.3;
 					b = b + (1 - b) * 0.3;
@@ -216,7 +210,7 @@
 	});
 
 	// ==========================================
-	// 4a. Push POSITIONS into geometry (only when positions change)
+	// 4a. Sync the position buffer.
 	// ==========================================
 	$effect(() => {
 		const pts = positions;
@@ -227,11 +221,11 @@
 		const posAttr = geo.getAttribute('position') as THREE.BufferAttribute | null;
 		const pointCount = pts.length / 3;
 		if (!posAttr || posAttr.count !== pointCount) {
-			// Point count changed: full attribute rebuild + bounding sphere required
+			// Rebuild the attribute when the point count changes.
 			geo.setAttribute('position', new THREE.BufferAttribute(pts, 3));
 			geo.computeBoundingSphere();
 		} else {
-			// Same count: in-place update, skip expensive bounding sphere recompute
+			// Otherwise update the buffer in place and skip the bounding sphere recompute.
 			posAttr.set(pts);
 			posAttr.needsUpdate = true;
 		}
@@ -240,7 +234,7 @@
 	});
 
 	// ==========================================
-	// 4b. Push COLORS into geometry (only when colors change)
+	// 4b. Sync the color buffer.
 	// ==========================================
 	$effect(() => {
 		const clrs = colors;
@@ -260,7 +254,7 @@
 	});
 
 	// ==========================================
-	// 5. Circle texture
+	// 5. Circle texture.
 	// ==========================================
 	function createCircleTexture() {
 		if (typeof window === 'undefined') return null;
@@ -279,7 +273,7 @@
 	const circleTexture = createCircleTexture();
 
 	// ==========================================
-	// 6. Proxy point — hovered point, always on top at 2x size
+	// 6. Hover proxy point.
 	// ==========================================
 	let proxyData2D = $derived.by(() => {
 		if (appState.selectedPointIdx === null) return null;
@@ -294,14 +288,14 @@
 
 		return {
 			position: new Float32Array([x, y, 0.5]),
-			// White ring behind + cluster color fill — two stacked proxy meshes
+			// Draw a ring behind the cluster-colored fill with two stacked proxy meshes.
 			fillColor: new Float32Array([c.r, c.g, c.b]),
 			ringColor: new Float32Array([0.2, 0.2, 0.2])
 		};
 	});
 
 	// ==========================================
-	// 7. Fast-path drag: directly patch GPU buffer, bypass reactive chain
+	// 7. Fast drag path.
 	// ==========================================
 	function fastMoveDraggedPoints(
 		renderIndices: number[],
@@ -313,16 +307,14 @@
 		const posAttr = geo.getAttribute('position') as THREE.BufferAttribute | null;
 		if (!posAttr) return { dataDx: 0, dataDy: 0 };
 
-		// Pixel → world: derived from the orthographic camera frustum + OrbitControls zoom.
-		// The camera frustum height (at zoom=1) is 2*halfH world units over $size.height pixels.
-		// OrbitControls zoom further divides the visible range, so effective world-per-pixel = 2*halfH / (height*zoom).
+		// Convert screen pixels to world units from the orthographic frustum and zoom.
 		const zoom = cameraRef?.zoom ?? 1;
 		const aspect = $size.width / $size.height;
 		const halfH = HALF_WORLD / Math.min(1, aspect);
 		const worldPerPx = (2 * halfH) / ($size.height * zoom);
 
 		const worldDx = screenDx * worldPerPx;
-		const worldDy = -screenDy * worldPerPx; // Y-axis flip
+		const worldDy = -screenDy * worldPerPx; // Flip Y to match screen space.
 
 		const arr = posAttr.array as Float32Array;
 		for (const ri of renderIndices) {
@@ -333,27 +325,26 @@
 		autoExpandForDraggedPoints(renderIndices, arr);
 		invalidate();
 
-		// Return data-space delta so View2D can accumulate and commit on drag end
+		// Return the data-space delta so View2D can commit it on drag end.
 		const dataDx = worldDx / _worldScale;
 		const dataDy = worldDy / _worldScale;
 		return { dataDx, dataDy };
 	}
 
-	// When dragged points approach or exit the camera's visible bounds, smoothly zoom out
-	// so the canvas expands to follow them.
+	// Zoom out smoothly when dragged points approach the edge of the visible bounds.
 	function autoExpandForDraggedPoints(renderIndices: number[], arr: Float32Array): void {
 		if (!cameraRef) return;
 		const cam = cameraRef;
 
-		// Camera center in world space (set by OrbitControls pan)
+		// Camera center in world space.
 		const camX = cam.position.x;
 		const camY = cam.position.y;
 
-		// Current visible half-extents in world units
+		// Current visible half-extents in world units.
 		const halfW_vis = Math.abs(cam.left) / cam.zoom;
 		const halfH_vis = cam.top / cam.zoom;
 
-		// Target: keep dragged points within 85% of the view edge (15% breathing room)
+		// Keep dragged points within 85% of the visible area.
 		const SAFE_FRACTION = 0.85;
 
 		let maxScaleNeeded = 1.0;
@@ -369,7 +360,7 @@
 		if (maxScaleNeeded > 1.0) {
 			const targetZoom = cam.zoom / maxScaleNeeded;
 			const MIN_ZOOM = 0.05;
-			// Lerp 30% toward target per mouse-move event → smooth expansion
+			// Lerp 30% toward the target zoom on each mouse move for smooth expansion.
 			cam.zoom = Math.max(MIN_ZOOM, cam.zoom + (targetZoom - cam.zoom) * 0.3);
 			cam.updateProjectionMatrix();
 		}
@@ -383,7 +374,7 @@
 	function setHoverEnabled(enabled: boolean): void {
 		hoverEnabled = enabled;
 		if (!enabled) {
-			// Cancel any pending hover and clear selection immediately
+			// Cancel any pending hover update and clear the selection immediately.
 			if (_hoverRafHandle !== null) {
 				cancelAnimationFrame(_hoverRafHandle);
 				_hoverRafHandle = null;
@@ -395,7 +386,7 @@
 	}
 
 	// ==========================================
-	// 8. Screen-rect → data-index lookup (for box selection)
+	// 8. Screen rectangle hit test.
 	// ==========================================
 	function getPointsInScreenRect(rect: {
 		left: number;
@@ -408,7 +399,7 @@
 		const W = $size.width;
 		const H = $size.height;
 
-		// Orthographic screen → world conversion (accounts for pan + zoom)
+		// Convert orthographic screen coordinates to world coordinates.
 		function screenToWorld(sx: number, sy: number): { wx: number; wy: number } {
 			const wx = (cam.left + (sx / W) * (cam.right - cam.left)) / cam.zoom + cam.position.x;
 			const wy = (cam.top - (sy / H) * (cam.top - cam.bottom)) / cam.zoom + cam.position.y;
@@ -438,25 +429,25 @@
 		return result;
 	}
 
-	// Expose fast-path API to View2D once the geometry is ready
+	// Expose the fast drag API to View2D once the geometry is ready.
 	$effect(() => {
 		if (!geometryRef || !onReady) return;
 		onReady({ fastMoveDraggedPoints, setOrbitEnabled, setHoverEnabled, getPointsInScreenRect });
 	});
 
 	// ==========================================
-	// 9. Event handlers
+	// 9. Event handlers.
 	// ==========================================
 	let _pendingHoverIdx: number | null = null;
 	let _hoverRafHandle: number | null = null;
 
 	function handlePointerMove(e: IndexedPointerEvent) {
 		if (!hoverEnabled || e.index === undefined) return;
-		// Cache the reactive reference locally to avoid repeated proxy tracking per event
+		// Cache the reactive reference locally to avoid repeated proxy tracking per event.
 		const pts = appState.pointsToRender;
 		_pendingHoverIdx = pts[e.index].idx;
 		document.body.style.cursor = 'pointer';
-		if (_hoverRafHandle !== null) return; // already scheduled
+		if (_hoverRafHandle !== null) return; // Already scheduled.
 		_hoverRafHandle = requestAnimationFrame(() => {
 			_hoverRafHandle = null;
 			if (_pendingHoverIdx !== null) {
@@ -544,7 +535,7 @@
 	</T.Points>
 {/if}
 
-<!-- Proxy ring (white, slightly larger) -->
+<!-- Hover ring -->
 {#if proxyData2D !== null}
 	<T.Points renderOrder={998}>
 		<T.BufferGeometry>
@@ -563,8 +554,7 @@
 		/>
 	</T.Points>
 
-	<!-- Proxy fill (cluster color) — purely visual, no interaction handlers.
-	     Clicks pass through to the main T.Points below to avoid double-toggling. -->
+	<!-- Hover fill. Keep it visual-only so clicks continue to hit the base point cloud. -->
 	<T.Points renderOrder={999}>
 		<T.BufferGeometry>
 			<T.BufferAttribute args={[proxyData2D.position, 3]} attach={attachAttribute('position')} />

@@ -6,11 +6,9 @@
 
 	let { autoRotate = false } = $props();
 
-	// Enable Threlte raycasting.
-	// Default threshold = 1 world unit is far too large: with sizeAttenuation=true
-	// the visual radius is material.size/2 ≈ 0.15–0.25 world units.
-	// Excess threshold causes the closest-by-depth neighbour to be picked instead
-	// of the point under the cursor, producing an apparent upper-right offset.
+	// Tune the raycaster threshold so hover picks stay aligned with the visible points.
+	// A fixed 1 world-unit threshold is too large for this material size and causes
+	// the nearest-by-depth point to be picked instead of the point under the cursor.
 	const interactivityCtx = interactivity();
 
 	type IndexedPointerEvent = {
@@ -28,7 +26,7 @@
 	});
 
 	// ==========================================
-	// 1. Positions — raw 3D coords, flat array
+	// 1. Position buffer.
 	// ==========================================
 	let positions = $derived.by(() => {
 		if (!appState.dataMatrix.length) return new Float32Array(0);
@@ -36,7 +34,7 @@
 	});
 
 	// ==========================================
-	// 1.5 RGB cache — rebuilt only when category info changes
+	// 1.5 RGB cache.
 	// ==========================================
 	const _tc3 = new THREE.Color();
 	let rgbCache3D = $derived.by(() => {
@@ -51,7 +49,7 @@
 	const _defaultRgb3D = { r: 0.8, g: 0.8, b: 0.8 };
 
 	// ==========================================
-	// 2. Colors — unified fading logic
+	// 2. Color buffer.
 	// ==========================================
 	let colors = $derived.by(() => {
 		if (!appState.dataMatrix.length) return new Float32Array(0);
@@ -67,11 +65,11 @@
 		const hasUnstable = appState.ifHighlightUnstablePoints;
 		const labels = appState.labelsOfSelectedCat;
 
-		// Fading is active only when something is hovered OR something is selected
+		// Fade only when something is hovered or selected.
 		const hasAnySelection = selectedIdx !== null || appState.draggedPointsIdx.length > 0;
 		const needsFade = hasUnstable || hasAnySelection;
 
-		// Which cluster is currently being hovered?
+		// Resolve the hovered cluster label.
 		const hoveredCluster = selectedIdx !== null ? String(labels[selectedIdx] ?? '') : null;
 
 		for (let i = 0; i < appState.dataSize; i++) {
@@ -100,12 +98,12 @@
 	});
 
 	// ==========================================
-	// 3. Point size
+	// 3. Point size.
 	// ==========================================
 	let pointSize = $derived(appState.dataSize > 10000 ? 0.3 : 0.5);
 
 	// ==========================================
-	// 4. Circle texture
+	// 4. Circle texture.
 	// ==========================================
 	function createCircleTexture() {
 		if (typeof window === 'undefined') return null;
@@ -124,7 +122,7 @@
 	const circleTexture = createCircleTexture();
 
 	// ==========================================
-	// 5. Proxy point — hovered point, always on top at 3x size
+	// 5. Hover proxy point.
 	// ==========================================
 	let proxyData = $derived.by(() => {
 		if (appState.selectedPointIdx === null) return null;
@@ -144,7 +142,7 @@
 	});
 
 	// ==========================================
-	// 6. Event handlers
+	// 6. Event handlers.
 	// ==========================================
 	function handlePointerMove(e: IndexedPointerEvent) {
 		if (e.index !== undefined) {
@@ -215,7 +213,7 @@
 	</T.Points>
 {/if}
 
-<!-- Proxy ring (dark charcoal, slightly larger) -->
+<!-- Hover ring -->
 {#if proxyData !== null}
 	<T.Points renderOrder={998}>
 		<T.BufferGeometry>
@@ -234,7 +232,7 @@
 		/>
 	</T.Points>
 
-	<!-- Proxy fill (cluster color) -->
+	<!-- Hover fill -->
 	<T.Points
 		renderOrder={999}
 		onclick={() => appState.toggleClusterSelection(appState.selectedPointIdx!)}

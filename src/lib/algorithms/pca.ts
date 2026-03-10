@@ -1,4 +1,3 @@
-// src/lib/algorithms/pca.ts
 // Lightweight PCA for UMAP initialization.
 // Extracts top 2 principal components via power iteration + Gram-Schmidt,
 // avoiding explicit covariance matrix construction (O(n*d) per iteration).
@@ -29,7 +28,7 @@ function normalize(v: Float64Array): Float64Array {
 function matvec(X: number[][], v: Float64Array | number[]): number[] {
 	const n = X.length;
 	const d = v.length;
-	// u = X * v  (n-vector) — typed array avoids boxing overhead
+	// u = X * v. A typed array avoids boxing overhead.
 	const u = new Float64Array(n);
 	for (let i = 0; i < n; i++) {
 		let s = 0;
@@ -37,7 +36,7 @@ function matvec(X: number[][], v: Float64Array | number[]): number[] {
 		for (let j = 0; j < d; j++) s += row[j] * v[j];
 		u[i] = s;
 	}
-	// result = X^T * u  (d-vector)
+	// result = X^T * u.
 	const result = new Float64Array(d);
 	for (let i = 0; i < n; i++) {
 		const ui = u[i];
@@ -49,21 +48,21 @@ function matvec(X: number[][], v: Float64Array | number[]): number[] {
 
 /**
  * Power iteration to find the dominant eigenvector of X^T X.
- * @param deflect  If provided, the result is deflated to be orthogonal to this vector (Gram-Schmidt).
+ * @param deflect If provided, the result is deflated to stay orthogonal to this vector.
  */
 function powerIterate(X: number[][], deflect: Float64Array | null, iters = 100): Float64Array {
 	const d = X[0].length;
-	// Deterministic start: uniform vector (Float64Array for typed-array path throughout)
+	// Start from a uniform vector to keep initialization deterministic.
 	const init = new Float64Array(d).fill(1);
 	let v = normalize(init);
 
 	for (let iter = 0; iter < iters; iter++) {
 		const mv = matvec(X, v);
-		// Convert matvec result (number[]) to Float64Array for normalize
+		// Convert the matvec result to a typed array before normalization.
 		const mvTyped = new Float64Array(mv);
 		v = normalize(mvTyped);
 		if (deflect) {
-			// Subtract projection onto deflect (Gram-Schmidt orthogonalization)
+			// Subtract the projection onto deflect for Gram-Schmidt orthogonalization.
 			const proj = dot(v, deflect);
 			const deflected = new Float64Array(d);
 			for (let i = 0; i < d; i++) deflected[i] = v[i] - proj * deflect[i];
@@ -75,8 +74,8 @@ function powerIterate(X: number[][], deflect: Float64Array | null, iters = 100):
 
 /**
  * Compute a 2D PCA initialization of `data` suitable for UMAP.
- * @returns embedding  n×2 array of projected coordinates, scaled to [-10, 10]
- * @returns timeMs     wall-clock time of the computation
+ * @returns embedding n x 2 array of projected coordinates, scaled to [-10, 10]
+ * @returns timeMs wall-clock time of the computation
  */
 export function pcaInit(data: number[][]): { embedding: number[][]; timeMs: number } {
 	const t0 = performance.now();
@@ -84,7 +83,7 @@ export function pcaInit(data: number[][]): { embedding: number[][]; timeMs: numb
 	const n = data.length;
 	const d = data[0].length;
 
-	// 1. Mean-center the data
+	// 1. Mean-center the data.
 	const mean = new Array<number>(d).fill(0);
 	for (const row of data) {
 		for (let j = 0; j < d; j++) mean[j] += row[j];
@@ -93,14 +92,14 @@ export function pcaInit(data: number[][]): { embedding: number[][]; timeMs: numb
 
 	const centered: number[][] = data.map((row) => row.map((v, j) => v - mean[j]));
 
-	// 2. Top 2 principal components via power iteration
+	// 2. Estimate the top two principal components with power iteration.
 	const pc1 = powerIterate(centered, null);
 	const pc2 = powerIterate(centered, pc1);
 
-	// 3. Project data onto pc1, pc2
+	// 3. Project the data onto pc1 and pc2.
 	const raw: number[][] = centered.map((row) => [dot(row, pc1), dot(row, pc2)]);
 
-	// 4. Normalize to [-10, 10] (matches umap-js random init scale)
+	// 4. Normalize to [-10, 10] to match the umap-js random initialization scale.
 	let maxAbs = 0;
 	for (const [x, y] of raw) {
 		if (Math.abs(x) > maxAbs) maxAbs = Math.abs(x);

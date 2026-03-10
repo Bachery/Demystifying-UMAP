@@ -1,6 +1,6 @@
 import { randomNormal, randomUniform } from 'd3-random';
 
-// 基础类型定义
+// Shared generator types.
 export interface GeneratorSettings {
 	num_samples: number;
 	noise?: number;
@@ -12,11 +12,10 @@ export type DatasetResult = {
 	labels: string[];
 };
 
-// --- 辅助函数：Box-Muller 变换生成标准正态分布 ---
-// d3-random 提供了生成器，但为了更灵活的控制（如复现特定逻辑），有时原生实现更方便
+// d3-random keeps the sampling code compact here.
 const rngUniform = randomUniform(0, 1);
 
-// 1. Uniform Sphere Sampling
+// 1. Uniform sphere sampling.
 export function generateUniformSphere(settings: {
 	center: number[];
 	farthest: number;
@@ -39,7 +38,7 @@ export function generateUniformSphere(settings: {
 	return points;
 }
 
-// 2. Multiple Blobs (模拟 sklearn.make_blobs)
+// 2. Multiple blobs, similar to sklearn.make_blobs.
 export function generateMultipleBlobs(settings: {
 	blobs: { num_samples: number; mean: number[]; std: number }[];
 }): DatasetResult {
@@ -57,10 +56,10 @@ export function generateMultipleBlobs(settings: {
 	return { data: X, labels };
 }
 
-// 3. Swiss Roll (模拟 sklearn.make_swiss_roll)
+// 3. Swiss roll, similar to sklearn.make_swiss_roll.
 export function generateSwissRoll(settings: GeneratorSettings): DatasetResult {
 	const { num_samples, noise = 0.0 } = settings;
-	const tGenerator = randomUniform(1.5 * Math.PI, 4.5 * Math.PI); // sklearn 默认范围
+	const tGenerator = randomUniform(1.5 * Math.PI, 4.5 * Math.PI); // sklearn default range
 	const yGenerator = randomUniform(0, 21);
 	const noiseGen = randomNormal(0, noise);
 
@@ -78,17 +77,17 @@ export function generateSwissRoll(settings: GeneratorSettings): DatasetResult {
 
 		data.push([x, y_noise, z]);
 		ys.push(y_noise);
-		labels.push(String(t)); // 原始标签通常是 t，这里转字符串
+		labels.push(String(t)); // The raw label is typically t, stored as a string here.
 	}
 
-	// Center Y (对应 Python: X[:, 1] -= np.mean(X[:, 1]))
+	// Center Y to match the Python reference implementation.
 	const meanY = ys.reduce((a, b) => a + b, 0) / num_samples;
 	data.forEach((p) => (p[1] -= meanY));
 
 	return { data, labels };
 }
 
-// 4. Two Moons (模拟 sklearn.make_moons + 3D扩展)
+// 4. Two moons, similar to sklearn.make_moons but extended to 3D.
 export function generateTwoMoons(settings: GeneratorSettings): DatasetResult {
 	const { num_samples, noise = 0.1 } = settings;
 	const n_samples_out = Math.floor(num_samples / 2);
@@ -98,24 +97,24 @@ export function generateTwoMoons(settings: GeneratorSettings): DatasetResult {
 	const data: number[][] = [];
 	const labels: string[] = [];
 
-	// Outer circle
+	// Outer arc.
 	const outer_circ_x = (t: number) => Math.cos(t);
 	const outer_circ_y = (t: number) => Math.sin(t);
 
 	for (let i = 0; i < n_samples_out; i++) {
-		const t = Math.PI * (i / n_samples_out); // linspace 0 to PI
+		const t = Math.PI * (i / n_samples_out); // linspace from 0 to PI
 		data.push([(outer_circ_x(t) + noiseGen()) * 10, (outer_circ_y(t) + noiseGen()) * 10, 0]);
 		labels.push('0');
 	}
 
-	// Inner circle
+	// Inner arc.
 	for (let i = 0; i < n_samples_in; i++) {
 		const t = Math.PI * (i / n_samples_in);
 		data.push([(1 - Math.cos(t) + noiseGen()) * 10, (1 - Math.sin(t) - 0.5 + noiseGen()) * 10, 0]);
 		labels.push('1');
 	}
 
-	// Centering
+	// Center the result.
 	const meanX = data.reduce((sum, p) => sum + p[0], 0) / num_samples;
 	const meanY = data.reduce((sum, p) => sum + p[1], 0) / num_samples;
 	data.forEach((p) => {
@@ -126,7 +125,7 @@ export function generateTwoMoons(settings: GeneratorSettings): DatasetResult {
 	return { data, labels };
 }
 
-// 5. Enclosed Blob
+// 5. Enclosed blob.
 export function generateEnclosedBlob(settings: {
 	num_inner: number;
 	num_outer: number;
@@ -136,18 +135,18 @@ export function generateEnclosedBlob(settings: {
 	const data: number[][] = [];
 	const labels: string[] = [];
 
-	// Inner Gaussian
+	// Inner Gaussian core.
 	const innerGen = randomNormal(0, 3);
 	for (let i = 0; i < num_inner; i++) {
 		data.push([innerGen(), innerGen(), innerGen()]);
 		labels.push('0');
 	}
 
-	// Outer Shell
+	// Outer shell.
 	for (let i = 0; i < num_outer; i++) {
 		const angle1 = rngUniform() * 2 * Math.PI;
-		const angle2 = rngUniform() * 2 * Math.PI; // 简化处理，不用完全球坐标分布，仅做演示覆盖
-		// Python 代码使用的是 column_stack 生成，这里模拟球面
+		const angle2 = rngUniform() * 2 * Math.PI; // Simplified spherical sampling is sufficient here.
+		// The Python reference uses column_stack; this version samples directly on the sphere.
 		data.push([
 			radius * Math.sin(angle1) * Math.cos(angle2),
 			radius * Math.sin(angle1) * Math.sin(angle2),
@@ -159,7 +158,7 @@ export function generateEnclosedBlob(settings: {
 	return { data, labels };
 }
 
-// 6. Connected Blobs (重点复刻)
+// 6. Connected blobs.
 export function generateConnectedBlobs(settings: {
 	bridge_samples: number;
 	cov_bridge: number;
@@ -168,15 +167,15 @@ export function generateConnectedBlobs(settings: {
 	const n_samples_per_cluster = 2000;
 	const cov_scale = 5.0;
 
-	// Mean vectors
+	// Cluster means.
 	const mean1 = [-10.0, 0.0, 0.0];
 	const mean2 = [10.0, 0.0, 0.0];
 
 	const data: number[][] = [];
 	const labels: string[] = [];
 
-	// Generate Cluster 1 & 2
-	const clusterGen = randomNormal(0, Math.sqrt(cov_scale)); // Cov是对角阵，所以各维度独立生成
+	// Generate the two dense endpoint clusters.
+	const clusterGen = randomNormal(0, Math.sqrt(cov_scale)); // Diagonal covariance keeps each axis independent.
 
 	for (let i = 0; i < n_samples_per_cluster; i++) {
 		data.push([mean1[0] + clusterGen(), mean1[1] + clusterGen(), mean1[2] + clusterGen()]);
@@ -187,33 +186,33 @@ export function generateConnectedBlobs(settings: {
 		labels.push('1');
 	}
 
-	// Generate Bridge
+	// Generate the sparse bridge.
 	const remove_ratio = 0.1;
 	const bridge_offset = 0.0;
 
-	// 逻辑：计算总数，去除中间，插值
+	// Compute the raw bridge length, remove a middle section, then interpolate across it.
 	const raw_num = Math.floor(bridge_samples / (1 - remove_ratio));
 	const num_remove = raw_num - bridge_samples;
 
 	const t_values: number[] = [];
 	const step = (1 - 2 * bridge_offset) / (raw_num - 1);
 
-	// 生成 t (linspace)
+	// Build the interpolation parameter sequence.
 	for (let i = 0; i < raw_num; i++) {
 		t_values.push(bridge_offset + i * step);
 	}
 
-	// 移除中间段 (Remove middle)
+	// Remove the middle portion.
 	const l = Math.floor(num_remove * 0.5);
 	const mid = Math.floor(raw_num / 2);
-	// t[:mid-l] + t[mid+l:]
+	// Equivalent to t[:mid-l] + t[mid+l:].
 	const keep_t = [...t_values.slice(0, mid - l), ...t_values.slice(mid + l)];
 
-	// 生成桥点
+	// Generate the bridge points.
 	const bridgeNoiseGen = randomNormal(0, Math.sqrt(cov_scale * cov_bridge));
 
 	keep_t.forEach((t) => {
-		// Linear interpolation of means
+		// Linearly interpolate between the two cluster means.
 		const mX = (1 - t) * mean1[0] + t * mean2[0];
 		const mY = (1 - t) * mean1[1] + t * mean2[1];
 		const mZ = (1 - t) * mean1[2] + t * mean2[2];
@@ -225,11 +224,11 @@ export function generateConnectedBlobs(settings: {
 	return { data, labels };
 }
 
-// 7. S-Curve
+// 7. S-curve.
 export function generateSCurve(settings: GeneratorSettings): DatasetResult {
 	const { num_samples, noise = 0.0 } = settings;
-	const tGen = randomUniform(-1.5 * Math.PI, 1.5 * Math.PI); // Sklearn 默认域
-	const yGen = randomUniform(0, 2); // Sklearn 默认 height
+	const tGen = randomUniform(-1.5 * Math.PI, 1.5 * Math.PI); // sklearn default domain
+	const yGen = randomUniform(0, 2); // sklearn default height
 	const noiseGen = randomNormal(0, noise);
 
 	const data: number[][] = [];
@@ -249,11 +248,11 @@ export function generateSCurve(settings: GeneratorSettings): DatasetResult {
 		labels.push(String(t));
 	}
 
-	// Center Y and Scale
+	// Center Y and scale the result.
 	const meanY = ys.reduce((a, b) => a + b, 0) / num_samples;
 	data.forEach((p) => {
 		p[1] -= meanY;
-		p[0] *= 6; // Python代码里做了 X *= 6
+		p[0] *= 6; // Match the Python reference scaling (X *= 6).
 		p[1] *= 6;
 		p[2] *= 6;
 	});
@@ -261,7 +260,7 @@ export function generateSCurve(settings: GeneratorSettings): DatasetResult {
 	return { data, labels };
 }
 
-// 8. Torus Surface
+// 8. Torus surface.
 export function generateTorus(settings: {
 	num_samples: number;
 	ring_radius: number;
@@ -269,7 +268,7 @@ export function generateTorus(settings: {
 }): DatasetResult {
 	const { num_samples, ring_radius: R, tube_radius: r } = settings;
 	const data: number[][] = [];
-	const labels: string[] = []; // Torus 默认 label 为 0
+	const labels: string[] = []; // Torus samples use label 0 by default.
 
 	for (let i = 0; i < num_samples; i++) {
 		const theta = rngUniform() * 2 * Math.PI;
@@ -285,7 +284,7 @@ export function generateTorus(settings: {
 	return { data, labels };
 }
 
-// 9. Uniform Strip
+// 9. Uniform strip.
 export function generateUniformStrip(settings: {
 	num_samples: number;
 	length: number;
@@ -296,12 +295,12 @@ export function generateUniformStrip(settings: {
 	const labels: string[] = [];
 
 	for (let i = 0; i < num_samples; i++) {
-		const x = rngUniform() * 2 * length - length; // -length to length
+		const x = rngUniform() * 2 * length - length; // [-length, length]
 		const y = rngUniform() * 2 * width - width;
 		const z = rngUniform() * 2 * width - width;
 
 		data.push([x, y, z]);
-		labels.push(String(x)); // Label is X coord
+		labels.push(String(x)); // Use the x coordinate as the label.
 	}
 	return { data, labels };
 }
