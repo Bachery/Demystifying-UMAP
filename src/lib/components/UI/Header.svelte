@@ -1,6 +1,6 @@
 <script lang="ts">
 	const githubUrl = 'https://github.com/Bachery/Demystifying-UMAP';
-	const paperUrl = 'https://vismeetsai.github.io/';
+	const paperUrl = 'https://journals.sagepub.com/doi/10.1177/14738716261434908';
 </script>
 
 <header

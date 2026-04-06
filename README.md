@@ -5,7 +5,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Three.js](https://img.shields.io/badge/Three.js-3D-000000?style=flat-square&logo=three.js&logoColor=white)](https://threejs.org/)
 [![UMAP-JS](https://img.shields.io/badge/umap--js-Interactive%20Embedding-111827?style=flat-square)](https://github.com/PAIR-code/umap-js)
-[![Paper](https://img.shields.io/badge/Paper-PacificVis%202026%20VisMeetsAI-0F766E?style=flat-square)](#research-context)
+[![Paper](https://img.shields.io/badge/Paper-Information%20Visualization-0F766E?style=flat-square)](https://doi.org/10.1177/14738716261434908)
 
 An interactive web application for diagnosing, understanding, and steering UMAP through synthetic 3D probe datasets.
 
@@ -90,9 +90,11 @@ Notes:
 
 This project accompanies the paper:
 
-**Demystifying UMAP Artifacts: An Interactive Study on Diagnosis and Steering using 3D Probes**
+**Demystifying UMAP artifacts: An interactive study on diagnosis and steering using 3D probes**
 
-Accepted to the **PacificVis 2026 VisMeetsAI workshop** and to appear in **Information Visualization**.
+**Paper:** [Information Visualization / DOI: 10.1177/14738716261434908](https://doi.org/10.1177/14738716261434908)
+
+Published in **Information Visualization** as part of the **PacificVis 2026 VisMeetsAI** special issue. First published online on **April 5, 2026**.
 
 <details>
 <summary>Abstract</summary>
@@ -103,7 +105,22 @@ Uniform Manifold Approximation and Projection (UMAP) has become a ubiquitous too
 
 ## Citation
 
-If this repository is useful in your research, please cite the paper above. A formatted citation entry will be added once the final publication metadata is available.
+If this repository is useful in your research, please cite:
+
+Chen, B., Xue, Y., Paetzold, P., and Deussen, O. (2026). *Demystifying UMAP artifacts: An interactive study on diagnosis and steering using 3D probes*. Information Visualization, 25(3). https://doi.org/10.1177/14738716261434908
+
+```bibtex
+@article{chen2026demystifying,
+  title = {Demystifying UMAP artifacts: An interactive study on diagnosis and steering using 3D probes},
+  author = {Chen, Bin and Xue, Yumeng and Paetzold, Patrick and Deussen, Oliver},
+  journal = {Information Visualization},
+  year = {2026},
+  volume = {25},
+  number = {3},
+  doi = {10.1177/14738716261434908},
+  url = {https://doi.org/10.1177/14738716261434908}
+}
+```
 
 ## License
 
