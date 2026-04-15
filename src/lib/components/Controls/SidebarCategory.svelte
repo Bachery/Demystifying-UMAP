@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { slide } from 'svelte/transition';
 	import { appState } from '$lib/stores/app.svelte';
+	import { viridisGradient } from '$lib/theme/viridis';
 
 	let { categoryName, initiallyExpanded = true } = $props();
 
@@ -26,11 +27,8 @@
 	{#if isExpanded}
 		<div class="mt-2 ml-4" transition:slide={{ duration: 150 }}>
 			{#if appState.dataset?.type === 'continuous' && appState.continuousRange}
-				<!-- Gradient bar for continuous labels, from blue at the minimum to red at the maximum. -->
-				<div
-					class="h-4 w-full rounded shadow-inner"
-					style="background: linear-gradient(to right, hsl(240,85%,50%), hsl(180,85%,50%), hsl(120,85%,50%), hsl(60,85%,50%), hsl(0,85%,50%));"
-				></div>
+				<!-- Continuous labels use the same viridis ramp as the scatter plots. -->
+				<div class="h-4 w-full rounded shadow-inner" style="background: {viridisGradient};"></div>
 				<div class="mt-1 flex justify-between font-mono text-[10px] text-gray-400">
 					<span>{appState.continuousRange.min.toFixed(2)}</span>
 					<span>{appState.continuousRange.max.toFixed(2)}</span>

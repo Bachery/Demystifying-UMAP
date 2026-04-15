@@ -2,7 +2,7 @@ import { type DatasetResult, DatasetLoader } from '$lib/algorithms/loader';
 import type { UMAPParams, WorkerResponseMessage } from '$lib/algorithms/umap.worker';
 import UmapWorker from '$lib/algorithms/umap.worker?worker';
 import { pcaInit } from '$lib/algorithms/pca';
-import { hsl } from 'd3-color';
+import { sampleViridisPalette, viridisColor } from '$lib/theme/viridis';
 
 const loader = new DatasetLoader();
 
@@ -461,27 +461,18 @@ export class AppState {
 
 			for (const [labelStr, count] of Object.entries(counts)) {
 				const t = (Number(labelStr) - minVal) / range; // Normalize to [0, 1].
-				// Map low values to blue and high values to red.
-				const color = hsl((1 - t) * 240, 0.85, 0.5);
-				info[labelStr] = { cluster_id: 0, size: count, color: color.formatHex() };
+				info[labelStr] = { cluster_id: 0, size: count, color: viridisColor(t) };
 			}
 		} else {
 			this.continuousRange = null;
-			const colors = [
-				'#1f77b4',
-				'#ff7f0e',
-				'#2ca02c',
-				'#d62728',
-				'#9467bd',
-				'#8c564b',
-				'#e377c2',
-				'#7f7f7f',
-				'#bcbd22',
-				'#17becf'
-			];
+			const palette = sampleViridisPalette(Object.keys(counts).length);
 			let index = 0;
 			for (const [labelStr, count] of Object.entries(counts)) {
-				info[labelStr] = { cluster_id: index, size: count, color: colors[index % colors.length] };
+				info[labelStr] = {
+					cluster_id: index,
+					size: count,
+					color: palette[index]
+				};
 				index++;
 			}
 		}
