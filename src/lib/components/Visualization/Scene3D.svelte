@@ -4,7 +4,7 @@
 	import { appState } from '$lib/stores/app.svelte';
 	import * as THREE from 'three';
 
-	let { autoRotate = false } = $props();
+	let { autoRotate = false, showGrid = true, showAxes = true } = $props();
 
 	// Tune the raycaster threshold so hover picks stay aligned with the visible points.
 	// A fixed 1 world-unit threshold is too large for this material size and causes
@@ -186,8 +186,13 @@
 <T.AmbientLight intensity={0.5} />
 <T.DirectionalLight position={[10, 10, 10]} intensity={1} />
 
-<T.AxesHelper args={[50]} />
-<Grid infiniteGrid fadeDistance={50} sectionColor="#eeeeee" cellColor="#dddddd" />
+{#if showAxes}
+	<T.AxesHelper args={[50]} />
+{/if}
+
+{#if showGrid}
+	<Grid infiniteGrid fadeDistance={50} sectionColor="#eeeeee" cellColor="#dddddd" />
+{/if}
 
 <!-- Main point cloud -->
 {#if positions.length > 0}

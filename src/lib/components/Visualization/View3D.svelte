@@ -3,16 +3,53 @@
 	import Scene3D from './Scene3D.svelte';
 	import { appState } from '$lib/stores/app.svelte';
 	import { WebGLRenderer } from 'three';
+	import ScreenshotDialog from '$lib/components/UI/ScreenshotDialog.svelte';
+	import {
+		downloadCanvasAsPng,
+		normalizePngFilename,
+		waitForCanvasRedraw
+	} from '$lib/utils/screenshot';
 
 	let autoRotate = $state(false);
+	let showGrid3D = $state(true);
+	let showAxes3D = $state(true);
+	let screenshotDialogOpen = $state(false);
+	let screenshotFilename = $state('');
+	let screenshotIncludeGrid = $state(true);
+	let screenshotIncludeAxes = $state(true);
+	let isSavingScreenshot = $state(false);
 
-	function handleScreenshot() {
-		const canvas = document.querySelector('#canvas-3d canvas') as HTMLCanvasElement;
-		if (canvas) {
-			const link = document.createElement('a');
-			link.download = `${appState.dataset?.name ?? 'ground-truth'}_3d.png`;
-			link.href = canvas.toDataURL('image/png');
-			link.click();
+	function getDefaultScreenshotFilename3D() {
+		return `${appState.dataset?.name ?? 'ground-truth'}_3d.png`;
+	}
+
+	function openScreenshotDialog3D() {
+		screenshotFilename = getDefaultScreenshotFilename3D();
+		screenshotIncludeGrid = showGrid3D;
+		screenshotIncludeAxes = showAxes3D;
+		screenshotDialogOpen = true;
+	}
+
+	async function saveScreenshot3D() {
+		isSavingScreenshot = true;
+		const previousShowGrid = showGrid3D;
+		const previousShowAxes = showAxes3D;
+		try {
+			showGrid3D = screenshotIncludeGrid;
+			showAxes3D = screenshotIncludeAxes;
+			await waitForCanvasRedraw();
+			const canvas = document.querySelector('#canvas-3d canvas') as HTMLCanvasElement | null;
+			if (canvas) {
+				downloadCanvasAsPng(
+					canvas,
+					normalizePngFilename(screenshotFilename, getDefaultScreenshotFilename3D())
+				);
+			}
+			screenshotDialogOpen = false;
+		} finally {
+			showGrid3D = previousShowGrid;
+			showAxes3D = previousShowAxes;
+			isSavingScreenshot = false;
 		}
 	}
 
@@ -53,7 +90,7 @@
 			});
 		}}
 	>
-		<Scene3D {autoRotate} />
+		<Scene3D {autoRotate} showGrid={showGrid3D} showAxes={showAxes3D} />
 	</Canvas>
 
 	<div
@@ -93,7 +130,7 @@
 				>
 			</button>
 			<button
-				onclick={handleScreenshot}
+				onclick={openScreenshotDialog3D}
 				class="rounded p-1.5 text-gray-500 transition-colors hover:bg-blue-50 hover:text-blue-600"
 				title="Save Screenshot"
 			>
@@ -114,3 +151,17 @@
 		</div>
 	</div>
 </div>
+
+<ScreenshotDialog
+	open={screenshotDialogOpen}
+	title="Save 3D View"
+	filename={screenshotFilename}
+	includeGrid={screenshotIncludeGrid}
+	includeAxes={screenshotIncludeAxes}
+	saving={isSavingScreenshot}
+	onCancel={() => (screenshotDialogOpen = false)}
+	onFilenameChange={(value) => (screenshotFilename = value)}
+	onIncludeGridChange={(value) => (screenshotIncludeGrid = value)}
+	onIncludeAxesChange={(value) => (screenshotIncludeAxes = value)}
+	onSave={saveScreenshot3D}
+/>

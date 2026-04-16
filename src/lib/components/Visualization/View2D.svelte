@@ -3,8 +3,18 @@
 	import Scene2D from './Scene2D.svelte';
 	import { appState } from '$lib/stores/app.svelte';
 	import { WebGLRenderer } from 'three';
+	import ScreenshotDialog from '$lib/components/UI/ScreenshotDialog.svelte';
+	import {
+		downloadCanvasAsPng,
+		normalizePngFilename,
+		waitForCanvasRedraw
+	} from '$lib/utils/screenshot';
 
 	let showGrid2D = $state(true);
+	let screenshotDialogOpen = $state(false);
+	let screenshotFilename = $state('');
+	let screenshotIncludeGrid = $state(true);
+	let isSavingScreenshot = $state(false);
 
 	// Box selection state.
 	let isSelecting = $state(false);
@@ -162,18 +172,34 @@
 		}
 	}
 
-	async function handleScreenshot2D() {
-		showGrid2D = false;
-		// Wait two animation frames so Threlte can redraw without the grid.
-		await new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())));
-		const canvas = document.querySelector('#canvas-2d canvas') as HTMLCanvasElement;
-		if (canvas) {
-			const link = document.createElement('a');
-			link.download = `${appState.dataset?.name ?? 'embedding'}_2d.png`;
-			link.href = canvas.toDataURL('image/png');
-			link.click();
+	function getDefaultScreenshotFilename2D() {
+		return `${appState.dataset?.name ?? 'embedding'}_2d.png`;
+	}
+
+	function openScreenshotDialog2D() {
+		screenshotFilename = getDefaultScreenshotFilename2D();
+		screenshotIncludeGrid = showGrid2D;
+		screenshotDialogOpen = true;
+	}
+
+	async function saveScreenshot2D() {
+		isSavingScreenshot = true;
+		const previousShowGrid = showGrid2D;
+		try {
+			showGrid2D = screenshotIncludeGrid;
+			await waitForCanvasRedraw();
+			const canvas = document.querySelector('#canvas-2d canvas') as HTMLCanvasElement | null;
+			if (canvas) {
+				downloadCanvasAsPng(
+					canvas,
+					normalizePngFilename(screenshotFilename, getDefaultScreenshotFilename2D())
+				);
+			}
+			screenshotDialogOpen = false;
+		} finally {
+			showGrid2D = previousShowGrid;
+			isSavingScreenshot = false;
 		}
-		showGrid2D = true;
 	}
 
 	function handleSaveData2D() {
@@ -319,7 +345,7 @@
 				>
 			</button>
 			<button
-				onclick={handleScreenshot2D}
+				onclick={openScreenshotDialog2D}
 				class="rounded p-1.5 text-gray-500 transition-colors hover:bg-blue-50 hover:text-blue-600"
 				title="Save Screenshot"
 			>
@@ -352,3 +378,15 @@
 		</div>
 	{/if}
 </div>
+
+<ScreenshotDialog
+	open={screenshotDialogOpen}
+	title="Save 2D View"
+	filename={screenshotFilename}
+	includeGrid={screenshotIncludeGrid}
+	saving={isSavingScreenshot}
+	onCancel={() => (screenshotDialogOpen = false)}
+	onFilenameChange={(value) => (screenshotFilename = value)}
+	onIncludeGridChange={(value) => (screenshotIncludeGrid = value)}
+	onSave={saveScreenshot2D}
+/>
