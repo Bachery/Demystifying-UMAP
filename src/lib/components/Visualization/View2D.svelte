@@ -10,7 +10,6 @@
 		waitForCanvasRedraw
 	} from '$lib/utils/screenshot';
 
-	let showGrid2D = $state(true);
 	let screenshotDialogOpen = $state(false);
 	let screenshotFilename = $state('');
 	let screenshotIncludeGrid = $state(true);
@@ -178,15 +177,15 @@
 
 	function openScreenshotDialog2D() {
 		screenshotFilename = getDefaultScreenshotFilename2D();
-		screenshotIncludeGrid = showGrid2D;
+		screenshotIncludeGrid = appState.showGrid2D;
 		screenshotDialogOpen = true;
 	}
 
 	async function saveScreenshot2D() {
 		isSavingScreenshot = true;
-		const previousShowGrid = showGrid2D;
+		const previousShowGrid = appState.showGrid2D;
 		try {
-			showGrid2D = screenshotIncludeGrid;
+			appState.showGrid2D = screenshotIncludeGrid;
 			await waitForCanvasRedraw();
 			const canvas = document.querySelector('#canvas-2d canvas') as HTMLCanvasElement | null;
 			if (canvas) {
@@ -197,7 +196,7 @@
 			}
 			screenshotDialogOpen = false;
 		} finally {
-			showGrid2D = previousShowGrid;
+			appState.showGrid2D = previousShowGrid;
 			isSavingScreenshot = false;
 		}
 	}
@@ -293,7 +292,7 @@
 		}}
 	>
 		<Scene2D
-			showGrid={showGrid2D}
+			showGrid={appState.showGrid2D}
 			onReady={(api) => {
 				_sceneAPI = api;
 			}}

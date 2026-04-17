@@ -1,10 +1,106 @@
 <script lang="ts">
 	import { appState } from '$lib/stores/app.svelte';
 	import type { UMAPParams } from '$lib/algorithms/umap.worker';
+	import AnimationExportDialog from '$lib/components/UI/AnimationExportDialog.svelte';
+	import {
+		downloadBlob,
+		getSupportedVideoMimeType,
+		normalizeWebmFilename,
+		waitForCanvasRedraw
+	} from '$lib/utils/screenshot';
+
+	let animationDialogOpen = $state(false);
+	let animationFilename = $state('');
+	let animationDurationSeconds = $state(1);
+	let animationIncludeGrid = $state(false);
+	let isSavingAnimation = $state(false);
 
 	function formatParams(params?: UMAPParams) {
 		if (!params) return 'N/A';
 		return `NN:${params.nNeighbors} | Ep:${params.nEpochs}`;
+	}
+
+	function canSaveAnimation() {
+		return appState.previousProjectionIdx !== -1 && appState.currentProjectionIdx !== -1;
+	}
+
+	function getDefaultAnimationFilename() {
+		return `${appState.dataset?.name ?? 'embedding'}_morph.webm`;
+	}
+
+	function openAnimationDialog() {
+		animationFilename = getDefaultAnimationFilename();
+		animationDurationSeconds = 1;
+		animationIncludeGrid = false;
+		animationDialogOpen = true;
+	}
+
+	async function saveAnimation() {
+		if (!canSaveAnimation()) return;
+		const canvas = document.querySelector('#canvas-2d canvas') as HTMLCanvasElement | null;
+		if (!canvas || typeof canvas.captureStream !== 'function') {
+			alert('This browser cannot record the 2D canvas.');
+			return;
+		}
+		if (typeof MediaRecorder === 'undefined') {
+			alert('This browser does not support video recording.');
+			return;
+		}
+
+		const safeDurationSeconds = Number.isFinite(animationDurationSeconds)
+			? animationDurationSeconds
+			: 1;
+		const durationMs = Math.max(0.1, safeDurationSeconds) * 1000;
+		const previousProgress = appState.animationProgress;
+		const previousShowGrid = appState.showGrid2D;
+		const mimeType = getSupportedVideoMimeType();
+		const chunks: BlobPart[] = [];
+		let stream: MediaStream | null = null;
+
+		isSavingAnimation = true;
+		try {
+			appState.showGrid2D = animationIncludeGrid;
+			appState.animationProgress = 0;
+			await waitForCanvasRedraw();
+
+			stream = canvas.captureStream(60);
+			const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+			const stopped = new Promise<Blob>((resolve, reject) => {
+				recorder.ondataavailable = (event) => {
+					if (event.data.size > 0) chunks.push(event.data);
+				};
+				recorder.onerror = () => reject(new Error('Video recording failed.'));
+				recorder.onstop = () =>
+					resolve(new Blob(chunks, { type: recorder.mimeType || mimeType || 'video/webm' }));
+			});
+
+			recorder.start();
+			const startTime = performance.now();
+			await new Promise<void>((resolve) => {
+				const step = (now: number) => {
+					const progress = Math.min(1, (now - startTime) / durationMs);
+					appState.animationProgress = progress;
+					if (progress < 1) {
+						requestAnimationFrame(step);
+					} else {
+						resolve();
+					}
+				};
+				requestAnimationFrame(step);
+			});
+			await waitForCanvasRedraw();
+			recorder.stop();
+			const blob = await stopped;
+			downloadBlob(blob, normalizeWebmFilename(animationFilename, getDefaultAnimationFilename()));
+			animationDialogOpen = false;
+		} finally {
+			if (stream) {
+				for (const track of stream.getTracks()) track.stop();
+			}
+			appState.animationProgress = previousProgress;
+			appState.showGrid2D = previousShowGrid;
+			isSavingAnimation = false;
+		}
 	}
 
 	let prevParams = $derived(appState.history[appState.previousProjectionIdx]?.params);
@@ -32,9 +128,18 @@
 	<!-- Comparison header -->
 	<div class="flex items-center justify-between">
 		<h4 class="text-xs font-bold tracking-wide text-gray-500 uppercase">Result Comparison</h4>
-		<span class="font-mono text-[10px] text-gray-400">
-			{Math.round(appState.animationProgress * 100)}%
-		</span>
+		<div class="flex items-center gap-2">
+			<button
+				class="rounded bg-purple-100 px-2 py-0.5 text-[9px] font-bold tracking-wide text-purple-700 uppercase transition-colors hover:bg-purple-200 disabled:cursor-not-allowed disabled:opacity-40"
+				disabled={!canSaveAnimation() || isSavingAnimation}
+				onclick={openAnimationDialog}
+			>
+				Save Animation
+			</button>
+			<span class="font-mono text-[10px] text-gray-400">
+				{Math.round(appState.animationProgress * 100)}%
+			</span>
+		</div>
 	</div>
 
 	<!-- Comparison scrubber -->
@@ -234,3 +339,16 @@
 		</div>
 	{/if}
 </div>
+
+<AnimationExportDialog
+	open={animationDialogOpen}
+	filename={animationFilename}
+	durationSeconds={animationDurationSeconds}
+	includeGrid={animationIncludeGrid}
+	saving={isSavingAnimation}
+	onCancel={() => (animationDialogOpen = false)}
+	onFilenameChange={(value) => (animationFilename = value)}
+	onDurationChange={(value) => (animationDurationSeconds = value)}
+	onIncludeGridChange={(value) => (animationIncludeGrid = value)}
+	onSave={saveAnimation}
+/>

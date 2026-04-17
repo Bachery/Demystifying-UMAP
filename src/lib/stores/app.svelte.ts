@@ -62,6 +62,7 @@ export class AppState {
 	currentProjectionIdx = $state(-1);
 	previousProjectionIdx = $state(-1);
 	animationProgress = $state(1.0);
+	showGrid2D = $state(true);
 	realtimeEmbedding = $state<number[][] | null>(null);
 
 	currentProjectionData = $derived.by(() => {
