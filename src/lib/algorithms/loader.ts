@@ -3,7 +3,7 @@ export type DatasetResult = {
 	type: 'continuous' | 'categorical';
 	data: number[][];
 	labels: (string | number)[];
-	source?: 'local' | 'generated';
+	source?: 'local' | 'generated' | 'uploaded';
 };
 
 const SPECTRAL_NN = [5, 15, 30, 50, 100, 200, 300, 500];

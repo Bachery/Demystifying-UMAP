@@ -3,6 +3,12 @@ import type { UMAPParams, WorkerResponseMessage } from '$lib/algorithms/umap.wor
 import UmapWorker from '$lib/algorithms/umap.worker?worker';
 import { pcaInit } from '$lib/algorithms/pca';
 import { sampleViridisPalette, viridisColor } from '$lib/theme/viridis';
+import {
+	buildUploadedDataset,
+	inferLabelType,
+	type UploadedDatasetBundle,
+	type UploadedTable
+} from '$lib/utils/uploadedDataset';
 
 const loader = new DatasetLoader();
 
@@ -31,6 +37,16 @@ export class AppState {
 	categoriesInfo = $state<Record<string, Record<string, CategoryInfo>>>({});
 	continuousRange = $state<{ min: number; max: number } | null>(null);
 	labelsOfSelectedCat = $state<string[]>([]);
+
+	uploadedTable = $state<UploadedTable | null>(null);
+	uploadedLabelColumns = $state<Record<string, Array<string | number>>>({});
+	uploadedNumericColumns = $state<string[]>([]);
+	selectedUploadedLabelColumn = $state('');
+	selectedUploadedDataColumns = $state<[string, string, string] | null>(null);
+	uploadedSkippedRows = $state(0);
+
+	uploadedLabelColumnNames = $derived.by(() => Object.keys(this.uploadedLabelColumns));
+	isUploadedDataset = $derived.by(() => this.dataset?.source === 'uploaded');
 
 	// ==========================================
 	// 2. UMAP parameters and run state
@@ -225,6 +241,10 @@ export class AppState {
 	// ==========================================
 
 	setDataset(result: DatasetResult) {
+		if (result.source !== 'uploaded') {
+			this.clearUploadedDataset();
+		}
+
 		this.dataset = result;
 		this.dataMatrix = result.data;
 		this.dataSize = result.data.length;
@@ -245,6 +265,45 @@ export class AppState {
 
 		// Choose a default initialization method based on the dataset source.
 		this.initMethod = result.source === 'local' ? 'spectral' : 'pca';
+	}
+
+	setUploadedDataset(bundle: UploadedDatasetBundle) {
+		this.uploadedTable = bundle.table;
+		this.uploadedLabelColumns = bundle.labelColumns;
+		this.uploadedNumericColumns = bundle.numericColumns;
+		this.selectedUploadedLabelColumn = bundle.selectedLabelColumn;
+		this.selectedUploadedDataColumns = bundle.selectedDataColumns;
+		this.uploadedSkippedRows = bundle.skippedRowCount;
+		this.setDataset(bundle.dataset);
+	}
+
+	setUploadedLabelColumn(columnName: string) {
+		const labels = this.uploadedLabelColumns[columnName];
+		if (!this.isUploadedDataset || !labels || !this.dataset) return;
+
+		const type = inferLabelType(labels);
+		this.selectedUploadedLabelColumn = columnName;
+		this.dataset = {
+			...this.dataset,
+			type,
+			labels
+		};
+		this.labelsOfSelectedCat = labels.map(String);
+		this.setupCategories(labels, type);
+		this.selectedPointIdx = null;
+		this.draggedPointsIdx = [];
+	}
+
+	setUploadedDataColumns(columns: [string, string, string]) {
+		if (!this.uploadedTable) return;
+		if (new Set(columns).size !== columns.length) return;
+
+		const bundle = buildUploadedDataset(this.uploadedTable, {
+			labelColumns: this.uploadedLabelColumnNames,
+			selectedLabelColumn: this.selectedUploadedLabelColumn,
+			dataColumns: columns
+		});
+		this.setUploadedDataset(bundle);
 	}
 
 	/**
@@ -436,6 +495,15 @@ export class AppState {
 		console.log(
 			`History updated. Curr: ${this.currentProjectionIdx}, Prev: ${this.previousProjectionIdx}`
 		);
+	}
+
+	private clearUploadedDataset() {
+		this.uploadedTable = null;
+		this.uploadedLabelColumns = {};
+		this.uploadedNumericColumns = [];
+		this.selectedUploadedLabelColumn = '';
+		this.selectedUploadedDataColumns = null;
+		this.uploadedSkippedRows = 0;
 	}
 
 	private setupCategories(labels: Array<string | number>, type: DatasetResult['type']) {
